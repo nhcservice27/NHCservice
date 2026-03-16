@@ -16,6 +16,7 @@ import ShippingPolicy from "./pages/ShippingPolicy";
 import RefundPolicy from "./pages/RefundPolicy";
 import Checkout from "./pages/Checkout";
 import ConfirmOrder from "./pages/ConfirmOrder";
+import SeedCyclingBenefits from "./pages/SeedCyclingBenefits";
 
 import { UserProvider } from "./context/UserContext";
 
@@ -41,6 +42,7 @@ const App = () => (
             <Route path="/profile" element={<CustomerProfile />} />
             <Route path="/checkout" element={<Checkout />} />
             <Route path="/confirm-order/:orderId" element={<ConfirmOrder />} />
+            <Route path="/seed-cycling-benefits" element={<SeedCyclingBenefits />} />
             <Route path="*" element={<NotFound />} />
           </Routes>
         </BrowserRouter>

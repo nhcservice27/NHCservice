@@ -13,7 +13,7 @@ import { useUser } from "@/context/UserContext";
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || '/api';
 
-export const Checkout = () => {
+const Checkout = () => {
     const location = useLocation();
     const navigate = useNavigate();
     const { customer, isLoggedIn, loading: authLoading, login: globalLogin } = useUser();
@@ -590,3 +590,5 @@ export const Checkout = () => {
         </div>
     );
 }
+
+export default Checkout;
