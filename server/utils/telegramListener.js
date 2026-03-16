@@ -44,7 +44,39 @@ export async function startTelegramListener() {
 
     console.log('🤖 [TELEGRAM] AI Agent Listener Starting...');
     console.log(`🤖 [TELEGRAM] Token: ${token.substring(0, 10)}... (length: ${token.length})`);
+
+    // Register bot commands so they show up in the menu
+    await registerBotCommands(token);
+
     pollTelegram(token);
+}
+
+async function registerBotCommands(token) {
+    try {
+        const url = `https://api.telegram.org/bot${token}/setMyCommands`;
+        const response = await fetch(url, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                commands: [
+                    { command: 'orders', description: 'List recent orders' },
+                    { command: 'customer', description: 'List recent customers' },
+                    { command: 'report', description: 'Show business report' },
+                    { command: 'inventory', description: 'Check stock levels' },
+                    { command: 'clear', description: 'Clear conversation history' },
+                    { command: 'start', description: 'Show welcome message' }
+                ]
+            })
+        });
+        const data = await response.json();
+        if (data.ok) {
+            console.log('✅ [TELEGRAM] Bot commands registered successfully');
+        } else {
+            console.error('❌ [TELEGRAM] Failed to register commands:', data.description);
+        }
+    } catch (error) {
+        console.error('❌ [TELEGRAM] Error registering commands:', error.message);
+    }
 }
 
 async function pollTelegram(token) {
@@ -75,16 +107,31 @@ async function handleIncomingMessage(token, message) {
     const userId = message.from.id;
     const userText = message.text;
 
-    // Handle commands
+    // ✅ SECURITY: Validate that the message is from the authorized admin chat
+    const authorizedChatId = process.env.TELEGRAM_CHAT_ID;
+    if (authorizedChatId && chatId.toString() !== authorizedChatId.toString()) {
+        console.warn(`⚠️ [TELEGRAM] Unauthorized access attempt from chat ID: ${chatId} (user: ${userId})`);
+        await sendReply(token, chatId, "⛔ Access Denied. You are not authorized to use this bot.");
+        return;
+    }
+
+    // Handle simple commands directly, pass others to AI
     if (userText.startsWith('/')) {
-        if (userText === '/start') {
+        const command = userText.split(' ')[0].toLowerCase();
+
+        if (command === '/start') {
             clearHistory(chatId);
             await sendReply(token, chatId, "Hello! I am your Cycle Harmony AI Assistant. 🤖\n\nI remember our conversation, so you can ask follow-up questions!\n\nAsk me anything about customers, orders, or inventory.\nI can also perform actions like changing order status, assigning delivery boys, and more!\n\nType /clear to reset our conversation memory.");
-        } else if (userText === '/clear') {
+            return;
+        } else if (command === '/clear') {
             clearHistory(chatId);
             await sendReply(token, chatId, "🧹 Conversation memory cleared! Starting fresh.");
+            return;
         }
-        return;
+
+        // For other commands like /orders, /report, etc., we let the AI handle them
+        // We'll strip the '/' so the AI sees it as a natural request or we can keep it
+        console.log(`🤖 AI handling command: ${command}`);
     }
 
     console.log(`📩 Message from ${userId}: ${userText}`);
@@ -92,12 +139,12 @@ async function handleIncomingMessage(token, message) {
     // Save user message to history
     addToHistory(chatId, 'user', userText);
 
-    // Show "typing" status
-    await fetch(`https://api.telegram.org/bot${token}/sendChatAction`, {
+    // Show "typing" status (non-blocking)
+    fetch(`https://api.telegram.org/bot${token}/sendChatAction`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ chat_id: chatId, action: 'typing' })
-    });
+    }).catch(err => console.error('Typing indicator error:', err.message));
 
     // Get conversation history for context
     const history = getHistory(chatId);

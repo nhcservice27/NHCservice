@@ -8,13 +8,16 @@ import { CycleCompanion } from "@/components/CycleCompanion";
 import { Footer } from "@/components/Footer";
 import { FadeIn } from "@/components/FadeIn";
 
+const RATE_P1 = Number(import.meta.env.VITE_PRICE_PER_LADDU_PHASE1 || 33.27);
+const RATE_P2 = Number(import.meta.env.VITE_PRICE_PER_LADDU_PHASE2 || 33.27);
+
 const products = [
     {
         id: 1,
         name: "Phase I Laddu",
         description: "Specially crafted with flaxseeds and pumpkin seeds to support your follicular phase. These nutrient-dense laddus help boost estrogen levels naturally and support healthy ovulation.",
-        price: 499,
-        originalPrice: 599,
+        price: Math.round(RATE_P1 * 15),
+        originalPrice: Math.round(RATE_P1 * 15 * 1.2),
         image: phase1Image,
         days: "Days 1-14",
         ingredients: "Flaxseeds, Pumpkin Seeds, Jaggery, Ghee",
@@ -34,8 +37,8 @@ const products = [
         id: 2,
         name: "Phase II Laddu",
         description: "Formulated with sesame seeds and sunflower seeds to nourish your luteal phase. These delicious laddus help support progesterone production and reduce PMS symptoms.",
-        price: 499,
-        originalPrice: 599,
+        price: Math.round(RATE_P2 * 15),
+        originalPrice: Math.round(RATE_P2 * 15 * 1.2),
         image: phase2Image,
         days: "Days 15-28",
         ingredients: "Sesame Seeds, Sunflower Seeds, Jaggery, Ghee",
@@ -202,7 +205,7 @@ export default function ShopNow() {
                                                 >
                                                     <span className="flex items-center gap-3">
                                                         <ShoppingCart className="h-5 w-5" />
-                                                        Add to Cart
+                                                        Check the Phase
                                                     </span>
                                                 </Button>
                                             </CardContent>

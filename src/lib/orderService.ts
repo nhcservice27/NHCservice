@@ -2,7 +2,7 @@
  * Service for handling order operations with MongoDB backend
  */
 
-const API_BASE_URL = '/api';
+const API_BASE_URL = import.meta.env.VITE_API_URL || '/api';
 
 export interface OrderData {
   fullName: string;
@@ -24,6 +24,10 @@ export interface OrderData {
   };
   paymentMethod: string;
   message: string;
+  planType?: string;
+  nextDeliveryDate?: string | null;
+  shippingDate?: string | null;
+  autoPhase2?: boolean;
 }
 
 export interface OrderResponse {

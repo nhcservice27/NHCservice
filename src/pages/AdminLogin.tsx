@@ -7,7 +7,9 @@ import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 import { Lock, User } from "lucide-react";
 
-export default function AdminLogin() {
+const API_BASE_URL = import.meta.env.VITE_API_URL || '/api';
+
+const AdminLogin = () => {
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
@@ -17,36 +19,41 @@ export default function AdminLogin() {
     e.preventDefault();
     setLoading(true);
 
-    // Simple authentication
-    if (username === "nany" && password === "123") {
-      // Store token in localStorage
-      const token = btoa(`${username}:${password}`);
-      localStorage.setItem("adminToken", token);
-      localStorage.setItem("userRole", "admin");
-      localStorage.setItem("adminUsername", username);
+    try {
+      const response = await fetch(`${API_BASE_URL}/auth/login`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username, password })
+      });
 
-      toast.success("Login successful!", {
-        description: "Welcome to the admin dashboard",
-      });
-      navigate("/admin/dashboard");
-    } else if (username === "ram@123" && password === "123") {
-      // Delivery Boy Login
-      const token = btoa(`${username}:${password}`);
-      localStorage.setItem("deliveryToken", token);
-      localStorage.setItem("userRole", "delivery");
-      localStorage.setItem("adminUsername", "Ram"); // Display name
+      const data = await response.json();
 
-      toast.success("Login successful!", {
-        description: "Welcome to the delivery dashboard",
+      if (data.success) {
+        // Store user info (JWT is now stored in an HTTP-only cookie by backend)
+        localStorage.setItem("userRole", data.data.role);
+        localStorage.setItem("adminUsername", data.data.displayName);
+
+        toast.success("Login successful!", {
+          description: `Welcome to the ${data.data.role} dashboard`,
+        });
+
+        if (data.data.role === 'admin') {
+          navigate("/admin/dashboard");
+        } else if (data.data.role === 'delivery') {
+          navigate("/delivery/dashboard");
+        }
+      } else {
+        toast.error("Login failed", {
+          description: data.message || "Invalid username or password",
+        });
+      }
+    } catch (err) {
+      toast.error("Connection error", {
+        description: "Could not reach the server",
       });
-      navigate("/delivery/dashboard");
-    } else {
-      toast.error("Login failed", {
-        description: "Invalid username or password",
-      });
+    } finally {
+      setLoading(false);
     }
-
-    setLoading(false);
   };
 
   return (
@@ -106,12 +113,6 @@ export default function AdminLogin() {
                 {loading ? "Logging in..." : "Login"}
               </Button>
             </form>
-
-            <div className="mt-6 text-center text-sm text-muted-foreground">
-              <p>Demo Credentials:</p>
-              <p className="font-mono mt-1">Admin: nany | 123</p>
-              <p className="font-mono mt-1">Delivery: ram@123 | 123</p>
-            </div>
           </CardContent>
         </Card>
 
@@ -124,5 +125,3 @@ export default function AdminLogin() {
     </div>
   );
 }
-
-

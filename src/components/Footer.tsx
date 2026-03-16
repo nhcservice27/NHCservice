@@ -94,34 +94,34 @@ export function Footer() {
                     {/* Column 4: Contact Us */}
                     <div className="space-y-6">
                         <h3 className="font-heading font-bold text-xl text-gray-800 relative inline-block after:content-[''] after:absolute after:-bottom-2 after:left-0 after:w-12 after:h-1 after:bg-wellness-pink after:rounded-full">Contact Us</h3>
-                        <div className="space-y-5 text-gray-600">
-                            <div className="flex items-start gap-4 p-4 bg-white/50 rounded-2xl shadow-sm hover:shadow-md transition-shadow">
-                                <div className="p-2 bg-green-100 rounded-full text-wellness-green">
-                                    <Phone className="h-5 w-5" />
+                        <div className="grid grid-cols-1 gap-3 text-gray-600">
+                            <div className="flex items-center gap-4 p-3 bg-white/70 backdrop-blur-sm rounded-xl border border-white/40 shadow-sm hover:shadow-md hover:bg-white/90 transition-all">
+                                <div className="p-2 bg-wellness-green-light/40 rounded-lg text-wellness-green shrink-0">
+                                    <Phone className="h-4 w-4" />
                                 </div>
-                                <div>
-                                    <p className="text-xs text-gray-500 font-semibold uppercase tracking-wider mb-1">Phone</p>
-                                    <p className="font-medium text-gray-900">+91 91934 71224</p>
-                                </div>
-                            </div>
-
-                            <div className="flex items-start gap-4 p-4 bg-white/50 rounded-2xl shadow-sm hover:shadow-md transition-shadow">
-                                <div className="p-2 bg-pink-100 rounded-full text-wellness-pink">
-                                    <Mail className="h-5 w-5" />
-                                </div>
-                                <div>
-                                    <p className="text-xs text-gray-500 font-semibold uppercase tracking-wider mb-1">Email</p>
-                                    <p className="font-medium text-gray-900">nhccycleharmony@gmail.com</p>
+                                <div className="overflow-hidden">
+                                    <p className="text-[10px] text-gray-400 font-bold uppercase tracking-widest mb-0.5">Phone</p>
+                                    <p className="font-medium text-gray-800 text-sm truncate">+91 91934 71224</p>
                                 </div>
                             </div>
 
-                            <div className="flex items-start gap-4 p-4 bg-white/50 rounded-2xl shadow-sm hover:shadow-md transition-shadow">
-                                <div className="p-2 bg-yellow-100 rounded-full text-yellow-600">
-                                    <MapPin className="h-5 w-5" />
+                            <div className="flex items-center gap-4 p-3 bg-white/70 backdrop-blur-sm rounded-xl border border-white/40 shadow-sm hover:shadow-md hover:bg-white/90 transition-all">
+                                <div className="p-2 bg-wellness-pink/40 rounded-lg text-wellness-pink shrink-0">
+                                    <Mail className="h-4 w-4" />
                                 </div>
-                                <div>
-                                    <p className="text-xs text-gray-500 font-semibold uppercase tracking-wider mb-1">Delivery Area</p>
-                                    <p className="font-medium text-gray-900">Hyderabad Only <span className="text-lg">🏠</span></p>
+                                <div className="overflow-hidden">
+                                    <p className="text-[10px] text-gray-400 font-bold uppercase tracking-widest mb-0.5">Email</p>
+                                    <p className="font-medium text-gray-800 text-sm truncate">nhccycleharmony@gmail.com</p>
+                                </div>
+                            </div>
+
+                            <div className="flex items-center gap-4 p-3 bg-white/70 backdrop-blur-sm rounded-xl border border-white/40 shadow-sm hover:shadow-md hover:bg-white/90 transition-all">
+                                <div className="p-2 bg-wellness-yellow/40 rounded-lg text-yellow-600 shrink-0">
+                                    <MapPin className="h-4 w-4" />
+                                </div>
+                                <div className="overflow-hidden">
+                                    <p className="text-[10px] text-gray-400 font-bold uppercase tracking-widest mb-0.5">Delivery Area</p>
+                                    <p className="font-medium text-gray-800 text-sm">Hyderabad Only <span className="text-base">🏠</span></p>
                                 </div>
                             </div>
                         </div>

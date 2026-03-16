@@ -1,6 +1,6 @@
 
 import { useState } from "react";
-import { Users, Search, ShoppingBag, DollarSign, Calendar, MapPin, Phone, Edit, Trash2, Clock } from "lucide-react";
+import { Users, Search, ShoppingBag, DollarSign, Calendar, MapPin, Phone, Edit, Trash2, Clock, CheckCircle } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -16,6 +16,7 @@ import {
     TableHeader,
     TableRow,
 } from "@/components/ui/table";
+import { formatDate } from "@/lib/utils";
 
 interface CustomersProps {
     customers: any[];
@@ -72,6 +73,7 @@ export function Customers({ customers, orders, handleEditCustomerClick, handleDe
                             <TableHead className="font-bold">Customer</TableHead>
                             <TableHead className="font-bold">Phone</TableHead>
                             <TableHead className="font-bold text-center">Orders</TableHead>
+                            <TableHead className="font-bold">Active Plan</TableHead>
                             <TableHead className="font-bold text-center">Spent</TableHead>
                             <TableHead className="font-bold text-right">Actions</TableHead>
                         </TableRow>
@@ -101,6 +103,22 @@ export function Customers({ customers, orders, handleEditCustomerClick, handleDe
                                     <Badge variant="secondary" className="bg-pink-100 text-pink-700 hover:bg-pink-100 rounded-md font-bold px-2 py-0.5">
                                         {customer.totalOrders || 0}
                                     </Badge>
+                                </TableCell>
+                                <TableCell>
+                                    {customer.planType ? (
+                                        <div className="space-y-1">
+                                            <Badge className={`${customer.planType === 'complete' ? 'bg-purple-100 text-purple-700' : 'bg-pink-100 text-pink-700'} border-none font-bold text-[10px]`}>
+                                                {customer.planType === 'complete' ? '🌼 Complete' : '🌸 Starter'}
+                                            </Badge>
+                                            {customer.subscriptionStatus === 'active' && customer.nextDeliveryDate && (
+                                                <p className="text-[9px] text-green-600 font-bold flex items-center gap-1">
+                                                    <Calendar className="w-2.5 h-2.5" /> {formatDate(customer.nextDeliveryDate)}
+                                                </p>
+                                            )}
+                                        </div>
+                                    ) : (
+                                        <span className="text-xs text-gray-400 font-medium italic">One-time guest</span>
+                                    )}
                                 </TableCell>
                                 <TableCell className="text-center font-bold text-green-600">
                                     ₹{(customer.totalSpent || 0).toLocaleString()}
@@ -169,9 +187,42 @@ export function Customers({ customers, orders, handleEditCustomerClick, handleDe
                                         <Badge variant="secondary" className="bg-purple-100 text-purple-700 hover:bg-purple-100">
                                             Lifetime Value: ₹{(selectedCustomer.totalSpent || 0).toLocaleString()}
                                         </Badge>
+                                        {selectedCustomer.planType && (
+                                            <Badge className={`${selectedCustomer.planType === 'complete' ? 'bg-purple-500' : 'bg-pink-500'} text-white border-none font-bold`}>
+                                                {selectedCustomer.planType === 'complete' ? 'Complete Balance Plan' : 'Cycle Starter Plan'}
+                                            </Badge>
+                                        )}
                                     </div>
                                 </div>
                             </div>
+
+                            {/* Active Subscription Details */}
+                            {selectedCustomer.subscriptionStatus === 'active' && (
+                                <Card className="border-green-100 bg-green-50/30 overflow-hidden relative">
+                                    <div className="absolute top-0 left-0 w-1.5 h-full bg-green-500"></div>
+                                    <CardHeader className="pb-2">
+                                        <CardTitle className="text-sm font-bold text-green-700 uppercase flex items-center gap-2">
+                                            <CheckCircle className="w-4 h-4" /> Active Subscription
+                                        </CardTitle>
+                                    </CardHeader>
+                                    <CardContent className="grid grid-cols-2 gap-6">
+                                        <div className="space-y-1">
+                                            <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Next delivery Scheduled</p>
+                                            <div className="flex items-center gap-2 text-gray-900">
+                                                <Calendar className="w-4 h-4 text-pink-500" />
+                                                <span className="font-bold text-lg">{formatDate(selectedCustomer.nextDeliveryDate)}</span>
+                                            </div>
+                                        </div>
+                                        <div className="space-y-1">
+                                            <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Automation Status</p>
+                                            <div className="flex items-center gap-2 text-gray-900">
+                                                <Clock className="w-4 h-4 text-blue-500" />
+                                                <span className="font-bold text-lg">{selectedCustomer.autoPhase2 ? 'Auto-Phase 2 On' : 'One-time Only'}</span>
+                                            </div>
+                                        </div>
+                                    </CardContent>
+                                </Card>
+                            )}
 
                             {/* Addresses */}
                             {selectedCustomer.addresses && Array.isArray(selectedCustomer.addresses) && selectedCustomer.addresses.length > 0 && (
@@ -209,7 +260,7 @@ export function Customers({ customers, orders, handleEditCustomerClick, handleDe
                                             <div className="bg-white p-3 rounded-xl border border-pink-100 shadow-sm">
                                                 <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">Last Period Start</p>
                                                 <p className="text-sm font-bold text-gray-900">
-                                                    {selectedCustomer.lastPeriodDate ? new Date(selectedCustomer.lastPeriodDate).toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' }) : 'N/A'}
+                                                    {formatDate(selectedCustomer.lastPeriodDate)}
                                                 </p>
                                             </div>
                                             <div className="bg-white p-3 rounded-xl border border-pink-100 shadow-sm">
@@ -241,9 +292,7 @@ export function Customers({ customers, orders, handleEditCustomerClick, handleDe
                                                         <div>
                                                             <p className="font-bold text-gray-800">Order #{order.orderId || (order._id ? order._id.toString().slice(-6).toUpperCase() : 'N/A')}</p>
                                                             <p className="text-xs text-gray-500">
-                                                                {order.createdAt ? new Date(order.createdAt).toLocaleDateString() : 'Unknown Date'}
-                                                                {' '}at{' '}
-                                                                {order.createdAt ? new Date(order.createdAt).toLocaleTimeString() : ''}
+                                                                {formatDate(order.createdAt)}
                                                             </p>
                                                         </div>
                                                         <StatusBadge status={order.orderStatus} />

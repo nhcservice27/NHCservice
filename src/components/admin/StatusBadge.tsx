@@ -1,6 +1,6 @@
 
 import { Badge } from "@/components/ui/badge";
-import { Clock, CheckCircle, Package, Truck, XCircle } from "lucide-react";
+import { Clock, CheckCircle, Package, Truck, XCircle, AlertTriangle } from "lucide-react";
 
 export function StatusBadge({ status }: { status: string }) {
     const variants: Record<string, any> = {
@@ -10,6 +10,7 @@ export function StatusBadge({ status }: { status: string }) {
         Shipped: { color: "bg-indigo-100 text-indigo-800 border-indigo-200", icon: Truck },
         Delivered: { color: "bg-green-100 text-green-800 border-green-200", icon: CheckCircle },
         Cancelled: { color: "bg-red-100 text-red-800 border-red-200", icon: XCircle },
+        "Not Approved": { color: "bg-gray-100 text-gray-800 border-gray-200", icon: AlertTriangle },
     };
 
     const variant = variants[status] || variants.Pending;

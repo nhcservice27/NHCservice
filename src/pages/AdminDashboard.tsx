@@ -19,8 +19,12 @@ import { Overview } from "@/components/admin/Overview";
 import { Customers } from "@/components/admin/Customers";
 import { Orders } from "@/components/admin/Orders";
 import { Reports } from "@/components/admin/Reports";
+import { InventoryStatus } from "@/components/admin/InventoryStatus";
+import { OrderRequests } from "@/components/admin/OrderRequests";
+import { FutureRequests } from "@/components/admin/FutureRequests";
+import { formatDate } from "@/lib/utils";
 
-const API_BASE_URL = '/api';
+const API_BASE_URL = import.meta.env.VITE_API_URL || '/api';
 const APP_VERSION = 'v1.1.2-reports-fix';
 
 const DELIVERY_BOYS = ["Ram"];
@@ -59,6 +63,7 @@ export default function AdminDashboard() {
       house: '',
       area: '',
       landmark: '',
+      mapLink: '',
       pincode: ''
     },
     message: ''
@@ -79,7 +84,10 @@ export default function AdminDashboard() {
   const [editCustomerForm, setEditCustomerForm] = useState({
     name: '',
     age: '',
-    phone: ''
+    phone: '',
+    planType: '',
+    subscriptionStatus: '',
+    autoPhase2: false
   });
 
   // Tracking state for sent emails
@@ -103,11 +111,7 @@ export default function AdminDashboard() {
   }, [sentEmails]);
 
   useEffect(() => {
-    const token = localStorage.getItem('adminToken');
-    if (!token) {
-      navigate('/admin/login');
-      return;
-    }
+    
 
     loadDashboardData();
     const refreshInterval = setInterval(loadDashboardData, 30000);
@@ -116,16 +120,24 @@ export default function AdminDashboard() {
 
   const loadDashboardData = async () => {
     try {
-      const token = localStorage.getItem('adminToken');
+      
       const searchParams = new URLSearchParams();
       if (searchQuery) searchParams.append('search', searchQuery);
 
       const [statsRes, ordersRes, customersRes, productsRes] = await Promise.all([
-        fetch(`${API_BASE_URL}/orders/stats`, { headers: { 'Authorization': `Bearer ${token}` } }),
-        fetch(`${API_BASE_URL}/orders?limit=20&${searchParams.toString()}`, { headers: { 'Authorization': `Bearer ${token}` } }),
-        fetch(`${API_BASE_URL}/customers?${searchParams.toString()}`, { headers: { 'Authorization': `Bearer ${token}` } }),
-        fetch(`${API_BASE_URL}/products`, { headers: { 'Authorization': `Bearer ${token}` } })
+        fetch(`${API_BASE_URL}/orders/stats`, { credentials: 'include' }),
+        fetch(`${API_BASE_URL}/orders?limit=500&${searchParams.toString()}`, { credentials: 'include' }),
+        fetch(`${API_BASE_URL}/customers?${searchParams.toString()}`, { credentials: 'include' }),
+        fetch(`${API_BASE_URL}/products`, { credentials: 'include' })
       ]);
+
+      // Check for authentication failure
+      if (statsRes.status === 401 || ordersRes.status === 401 || customersRes.status === 401 || productsRes.status === 401) {
+        localStorage.removeItem('adminToken');
+        toast.error("Session expired. Please login again.");
+        navigate('/admin/login');
+        return;
+      }
 
       const statsBackend = await statsRes.json();
       const ordersData = await ordersRes.json();
@@ -155,8 +167,15 @@ export default function AdminDashboard() {
         customerMap.set(c.phone, { ...c, totalOrders: 0, totalSpent: 0 });
       });
 
-      // Merge legacy orders into customers
+      let totalStarter = 0;
+      let totalComplete = 0;
       ordersData.data?.forEach((order: any) => {
+        const customerProfile = customerMap.get(order.phone);
+        const currentPlan = customerProfile?.planType || order.planType;
+
+        if (currentPlan === 'starter') totalStarter++;
+        if (currentPlan === 'complete') totalComplete++;
+
         if (!customerMap.has(order.phone)) {
           // Create temp customer from order
           customerMap.set(order.phone, {
@@ -176,8 +195,17 @@ export default function AdminDashboard() {
         if (!customer.fullName && customer.name) customer.fullName = customer.name;
       });
 
+      const activeSubscriptions = Array.from(customerMap.values()).filter((c: any) => c.subscriptionStatus === 'active').length;
+
       setStats({
-        overview: { totalCustomers: customerMap.size, totalOrders, totalRevenue },
+        overview: {
+          totalCustomers: customerMap.size,
+          totalOrders,
+          totalRevenue,
+          totalStarter,
+          totalComplete,
+          activeSubscriptions
+        },
         orderStatus: { pending: pendingOrders, delivered: deliveredOrders },
         recentOrders: ordersData.data?.slice(0, 5) || [] // Top 5 for overview
       });
@@ -192,8 +220,9 @@ export default function AdminDashboard() {
     }
   };
 
-  const handleLogout = () => {
-    localStorage.removeItem('adminToken');
+  const handleLogout = async () => {
+    await fetch(`${API_BASE_URL}/auth/logout`, { method: 'POST', credentials: 'include' });
+    localStorage.removeItem('userRole');
     localStorage.removeItem('adminUsername');
     toast.success("Logged out successfully");
     navigate("/admin/login");
@@ -203,10 +232,10 @@ export default function AdminDashboard() {
 
   const handleStatusUpdate = async (orderId: string, newStatus: string, deliveryDate?: string) => {
     try {
-      const token = localStorage.getItem('adminToken');
+      
       const response = await fetch(`${API_BASE_URL}/orders/${orderId}/status`, {
         method: 'PATCH',
-        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+        headers: { 'Content-Type': 'application/json' }, credentials: 'include',
         body: JSON.stringify({ status: newStatus, deliveryDate }),
       });
       if (response.ok) {
@@ -226,12 +255,38 @@ export default function AdminDashboard() {
     }
   };
 
+  const handleProcessFutureRequest = async (orderId: string, updates: any) => {
+    try {
+      
+      const response = await fetch(`${API_BASE_URL}/orders/${orderId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' }, credentials: 'include',
+        body: JSON.stringify(updates),
+      });
+      const data = await response.json();
+      if (response.ok && data.success) {
+        toast.success("Future request processed & sent!");
+        loadDashboardData();
+        // If the backend doesn't auto-send a telegram on this specific PATCH, 
+        // we might need to trigger it, but setting it to 'Requested' handles it usually
+      } else {
+        toast.error(data.message || "Failed to process request");
+      }
+    } catch (error) {
+      toast.error("Network error processing request");
+    }
+  };
+
   const handleWhatsAppSend = (order: any) => {
     let message = "";
     const customerName = order.fullName || "Valued Customer";
     const orderId = order.orderId || (order._id ? order._id.toString().slice(-6).toUpperCase() : 'N/A');
+    const baseUrl = window.location.origin;
+    const confirmLink = `${baseUrl}/confirm-order/${order._id}`;
 
-    if (order.orderStatus === 'Confirmed') {
+    if (order.orderStatus === 'Requested') {
+      message = `Hi ${customerName}, NHC Service has initiated an order for you.\n\nPlease confirm your delivery details and select a payment method in your profile here:\n${baseUrl}/profile\n\nThank you!`;
+    } else if (order.orderStatus === 'Confirmed') {
       message = `Hi ${customerName}, your order (ID: ${orderId}) is confirmed ${String.fromCodePoint(0x2705)}`;
     } else if (order.orderStatus === 'Shipped') {
       message = `Hi ${customerName}, your order (ID: ${orderId}) is shipped ${String.fromCodePoint(0x1F69A)}`;
@@ -249,6 +304,23 @@ export default function AdminDashboard() {
     setSentMessages(prev => new Set(prev).add(order._id));
   };
 
+  const handleGmailSend = (order: any) => {
+    const customerName = order.fullName || "Valued Customer";
+    const baseUrl = window.location.origin;
+    const subject = encodeURIComponent("Order Confirmation Request - NHC Service");
+    let body = "";
+
+    if (order.orderStatus === 'Requested') {
+      body = `Hi ${customerName},\n\nNHC Service has initiated an order for you. Please confirm your delivery details and select a payment method in your profile here:\n\n${baseUrl}/profile\n\nThank you!`;
+    } else {
+      const orderId = order.orderId || (order._id ? order._id.toString().slice(-6).toUpperCase() : 'N/A');
+      body = `Hi ${customerName},\n\nYour order (ID: ${orderId}) status has been updated to: ${order.orderStatus}.\n\nYou can track your orders in your profile:\n${baseUrl}/profile\n\nThank you!`;
+    }
+
+    const encodedBody = encodeURIComponent(body);
+    window.open(`mailto:${order.email || ''}?subject=${subject}&body=${encodedBody}`, '_blank');
+  };
+
 
   // --- Order Edit/Delete ---
   const handleEditClick = (order: any) => {
@@ -262,6 +334,7 @@ export default function AdminDashboard() {
         house: order.address?.house || '',
         area: order.address?.area || '',
         landmark: order.address?.landmark || '',
+        mapLink: order.address?.mapLink || '',
         pincode: order.address?.pincode || ''
       },
       message: order.message || ''
@@ -272,10 +345,10 @@ export default function AdminDashboard() {
   const handleSaveEdit = async () => {
     if (!editingOrder) return;
     try {
-      const token = localStorage.getItem('adminToken');
+      
       const response = await fetch(`${API_BASE_URL}/orders/${editingOrder._id}`, {
         method: 'PATCH',
-        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+        headers: { 'Content-Type': 'application/json' }, credentials: 'include',
         body: JSON.stringify(editForm)
       });
       if (response.ok) {
@@ -299,10 +372,10 @@ export default function AdminDashboard() {
   const confirmDelete = async () => {
     if (!deletingOrderId) return;
     try {
-      const token = localStorage.getItem('adminToken');
+      
       const response = await fetch(`${API_BASE_URL}/orders/${deletingOrderId}`, {
         method: 'DELETE',
-        headers: { 'Authorization': `Bearer ${token}` }
+        credentials: 'include'
       });
       if (response.ok) {
         toast.success("Order deleted");
@@ -327,12 +400,10 @@ export default function AdminDashboard() {
 
   const handleEmailNotify = async (orderId: string) => {
     try {
-      const token = localStorage.getItem('adminToken');
+      
       const response = await fetch(`${API_BASE_URL}/orders/${orderId}/notify`, {
         method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${token}`
-        }
+        credentials: 'include'
       });
       const data = await response.json();
       if (data.success) {
@@ -349,10 +420,10 @@ export default function AdminDashboard() {
   const handleSaveDeliveryAssignment = async () => {
     if (!assigningOrder) return;
     try {
-      const token = localStorage.getItem('adminToken');
+      
       const response = await fetch(`${API_BASE_URL}/orders/${assigningOrder._id}`, {
         method: 'PATCH',
-        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+        headers: { 'Content-Type': 'application/json' }, credentials: 'include',
         body: JSON.stringify({
           deliveryBoy: assignDeliveryForm.name
         })
@@ -373,10 +444,10 @@ export default function AdminDashboard() {
   const handleDeassignDelivery = async () => {
     if (!assigningOrder) return;
     try {
-      const token = localStorage.getItem('adminToken');
+      
       const response = await fetch(`${API_BASE_URL}/orders/${assigningOrder._id}`, {
         method: 'PATCH',
-        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+        headers: { 'Content-Type': 'application/json' }, credentials: 'include',
         body: JSON.stringify({
           deliveryBoy: '',
           deliveryBoyPhone: ''
@@ -399,19 +470,22 @@ export default function AdminDashboard() {
   const handleEditCustomerClick = (customer: any) => {
     setEditingCustomer(customer);
     setEditCustomerForm({
-      name: customer.fullName || customer.name,
-      age: customer.age,
-      phone: customer.phone
+      name: customer.fullName || customer.name || '',
+      age: customer.age || '',
+      phone: customer.phone || '',
+      planType: customer.planType || 'none',
+      subscriptionStatus: customer.subscriptionStatus || 'none',
+      autoPhase2: customer.autoPhase2 || false
     });
     setIsEditCustomerDialogOpen(true);
   };
 
   const handleSaveEditCustomer = async () => {
     try {
-      const token = localStorage.getItem('adminToken');
+      
       const response = await fetch(`${API_BASE_URL}/customers/${editingCustomer._id}`, {
         method: 'PATCH',
-        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+        headers: { 'Content-Type': 'application/json' }, credentials: 'include',
         body: JSON.stringify(editCustomerForm)
       });
       if (response.ok) {
@@ -429,10 +503,10 @@ export default function AdminDashboard() {
 
   const confirmDeleteCustomer = async () => {
     try {
-      const token = localStorage.getItem('adminToken');
+      
       const response = await fetch(`${API_BASE_URL}/customers/${deletingCustomerId}`, {
         method: 'DELETE',
-        headers: { 'Authorization': `Bearer ${token}` }
+        credentials: 'include'
       });
       if (response.ok) {
         toast.success("Customer deleted");
@@ -448,11 +522,11 @@ export default function AdminDashboard() {
 
   const fetchRevenueData = async () => {
     try {
-      const token = localStorage.getItem('adminToken');
+      
       setLoading(true);
       const url = `${API_BASE_URL}/orders/revenue-chart?month=${reportMonth}&year=${reportYear}`;
       const response = await fetch(url, {
-        headers: { 'Authorization': `Bearer ${token}` }
+        credentials: 'include'
       });
       const data = await response.json();
       if (data.success) setRevenueData(data.data);
@@ -462,11 +536,11 @@ export default function AdminDashboard() {
 
   const fetchMonthlySummary = async () => {
     try {
-      const token = localStorage.getItem('adminToken');
+      
       setLoading(true);
       const url = `${API_BASE_URL}/orders/monthly-summary?month=${reportMonth}&year=${reportYear}`;
       const response = await fetch(url, {
-        headers: { 'Authorization': `Bearer ${token}` }
+        credentials: 'include'
       });
       const data = await response.json();
       if (data.success) setSummaryData(data.data);
@@ -476,11 +550,11 @@ export default function AdminDashboard() {
 
   const fetchOrdersReport = async () => {
     try {
-      const token = localStorage.getItem('adminToken');
+      
       setLoading(true);
       const url = `${API_BASE_URL}/orders/report?month=${reportMonth}&year=${reportYear}`;
       const response = await fetch(url, {
-        headers: { 'Authorization': `Bearer ${token}` }
+        credentials: 'include'
       });
       const data = await response.json();
       if (data.success) setOrdersReportData(data.data);
@@ -508,9 +582,9 @@ export default function AdminDashboard() {
   const handleDownloadPDF = async () => {
     try {
       setIsExporting(true);
-      const token = localStorage.getItem('adminToken');
+      
       const response = await fetch(`${API_BASE_URL}/orders/export/pdf?month=${reportMonth}&year=${reportYear}`, {
-        headers: { 'Authorization': `Bearer ${token}` }
+        credentials: 'include'
       });
       if (!response.ok) throw new Error('Failed');
       const blob = await response.blob();
@@ -524,9 +598,9 @@ export default function AdminDashboard() {
   const handleDownloadReportCSV = async () => {
     try {
       setIsExporting(true);
-      const token = localStorage.getItem('adminToken');
+      
       const response = await fetch(`${API_BASE_URL}/orders/export/csv?month=${reportMonth}&year=${reportYear}`, {
-        headers: { 'Authorization': `Bearer ${token}` }
+        credentials: 'include'
       });
       if (!response.ok) throw new Error('Failed');
       const blob = await response.blob();
@@ -540,7 +614,7 @@ export default function AdminDashboard() {
   const handleExportCSV = () => {
     const csvContent = "data:text/csv;charset=utf-8,"
       + "Order ID,Name,Phone,Price,Date,Status,Delivery Boy\n"
-      + orders.map(e => `${e.orderId || e._id},${e.fullName},${e.phone},${e.totalPrice},${new Date(e.createdAt).toLocaleDateString()},${e.orderStatus},${e.deliveryBoy || ''}`).join("\n");
+      + orders.map(e => `${e.orderId || e._id},${e.fullName},${e.phone},${e.totalPrice},${formatDate(e.createdAt)},${e.orderStatus},${e.deliveryBoy || ''}`).join("\n");
     const encodedUri = encodeURI(csvContent);
     const link = document.createElement("a");
     link.setAttribute("href", encodedUri);
@@ -588,11 +662,30 @@ export default function AdminDashboard() {
           handleDeleteClick={handleDeleteClick}
           handleEditClick={handleEditClick}
           handleWhatsAppSend={handleWhatsAppSend}
+          handleGmailSend={handleGmailSend}
           handleAssignDeliveryClick={handleAssignDeliveryClick}
           sentMessages={sentMessages}
           handleExportCSV={handleExportCSV}
           handleEmailNotify={handleEmailNotify}
           sentEmails={sentEmails}
+          customers={customers}
+        />
+      )}
+
+      {activeTab === 'requests' && (
+        <OrderRequests
+          orders={orders}
+          customers={customers}
+          handleWhatsAppSend={handleWhatsAppSend}
+          handleEmailNotify={handleEmailNotify}
+        />
+      )}
+
+      {activeTab === 'future' && (
+        <FutureRequests
+          orders={orders}
+          customers={customers}
+          handleProcessRequest={handleProcessFutureRequest}
         />
       )}
 
@@ -613,6 +706,12 @@ export default function AdminDashboard() {
           isExporting={isExporting}
           loading={loading}
         />
+      )}
+
+      {activeTab === 'inventory' && (
+        <div key="inventory-tab">
+          <InventoryStatus />
+        </div>
       )}
 
       {/* --- Dialogs --- */}
@@ -657,6 +756,10 @@ export default function AdminDashboard() {
                 <Label>Pincode</Label>
                 <Input value={editForm.address.pincode} onChange={e => setEditForm({ ...editForm, address: { ...editForm.address, pincode: e.target.value } })} />
               </div>
+            </div>
+            <div className="grid gap-2">
+              <Label>Google Maps Link</Label>
+              <Input value={editForm.address.mapLink} onChange={e => setEditForm({ ...editForm, address: { ...editForm.address, mapLink: e.target.value } })} />
             </div>
             <div className="grid gap-2">
               <Label>Message Card</Label>
@@ -730,6 +833,28 @@ export default function AdminDashboard() {
             <div className="grid gap-2">
               <Label>Phone Number</Label>
               <Input value={editCustomerForm.phone} onChange={e => setEditCustomerForm({ ...editCustomerForm, phone: e.target.value })} />
+            </div>
+            <div className="grid gap-2">
+              <Label>Plan Type</Label>
+              <Select value={editCustomerForm.planType} onValueChange={v => setEditCustomerForm({ ...editCustomerForm, planType: v })}>
+                <SelectTrigger><SelectValue placeholder="Select Plan" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="starter">Starter Plan</SelectItem>
+                  <SelectItem value="complete">Complete Plan</SelectItem>
+                  <SelectItem value="none">No Plan</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="grid gap-2">
+              <Label>Subscription Status</Label>
+              <Select value={editCustomerForm.subscriptionStatus} onValueChange={v => setEditCustomerForm({ ...editCustomerForm, subscriptionStatus: v })}>
+                <SelectTrigger><SelectValue placeholder="Select Status" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="active">Active</SelectItem>
+                  <SelectItem value="inactive">Inactive</SelectItem>
+                  <SelectItem value="none">None</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
           </div>
           <DialogFooter>

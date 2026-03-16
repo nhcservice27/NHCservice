@@ -1,4 +1,4 @@
-import { LayoutDashboard, Users, ShoppingBag, BarChart3, LogOut, X, FileText } from "lucide-react";
+import { LayoutDashboard, Users, ShoppingBag, BarChart3, LogOut, X, Package, MessageCircle, Calendar } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
 interface SidebarProps {
@@ -80,6 +80,45 @@ export function Sidebar({ activeTab, setActiveTab, mobileMenuOpen, setMobileMenu
                         >
                             <BarChart3 className={`w-5 h-5 mr-3 ${activeTab === 'reports' ? 'text-pink-600' : 'text-gray-400'}`} />
                             Reports
+                        </Button>
+
+                        {/* Inventory */}
+                        <Button
+                            variant="ghost"
+                            onClick={() => { setActiveTab('inventory'); setMobileMenuOpen(false); }}
+                            className={`w-full justify-start transition-all duration-200 ${activeTab === 'inventory'
+                                ? 'bg-pink-50 text-pink-700 font-semibold shadow-sm'
+                                : 'text-gray-600 hover:bg-white/50 hover:text-gray-900'
+                                }`}
+                        >
+                            <Package className={`w-5 h-5 mr-3 ${activeTab === 'inventory' ? 'text-pink-600' : 'text-gray-400'}`} />
+                            Inventory Status
+                        </Button>
+
+                        {/* Order Requests */}
+                        <Button
+                            variant="ghost"
+                            onClick={() => { setActiveTab('requests'); setMobileMenuOpen(false); }}
+                            className={`w-full justify-start transition-all duration-200 ${activeTab === 'requests'
+                                ? 'bg-pink-50 text-pink-700 font-semibold shadow-sm'
+                                : 'text-gray-600 hover:bg-white/50 hover:text-gray-900'
+                                }`}
+                        >
+                            <MessageCircle className={`w-5 h-5 mr-3 ${activeTab === 'requests' ? 'text-pink-600' : 'text-gray-400'}`} />
+                            Requst by custem
+                        </Button>
+
+                        {/* Future Requests */}
+                        <Button
+                            variant="ghost"
+                            onClick={() => { setActiveTab('future'); setMobileMenuOpen(false); }}
+                            className={`w-full justify-start transition-all duration-200 ${activeTab === 'future'
+                                ? 'bg-blue-50 text-blue-700 font-semibold shadow-sm'
+                                : 'text-gray-600 hover:bg-white/50 hover:text-gray-900'
+                                }`}
+                        >
+                            <Calendar className={`w-5 h-5 mr-3 ${activeTab === 'future' ? 'text-blue-600' : 'text-gray-400'}`} />
+                            Future Requests
                         </Button>
                     </nav>
                 </div>

@@ -10,6 +10,7 @@ import { Badge } from "@/components/ui/badge";
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import { StatusBadge } from "./StatusBadge";
 import { useState } from "react";
+import { formatDate } from "@/lib/utils";
 
 interface ReportsProps {
     reportCategory: string;
@@ -296,7 +297,7 @@ export function Reports({
                                                 ) : ordersReportData.map((order: any) => (
                                                     <tr key={order._id} className="hover:bg-gray-50/50">
                                                         <td className="px-6 py-3 text-gray-500">
-                                                            {new Date(order.createdAt).toLocaleDateString()}
+                                                            {formatDate(order.createdAt)}
                                                         </td>
                                                         <td className="px-6 py-3 font-mono text-gray-600">
                                                             #{order.orderId || (order._id ? order._id.toString().slice(-6).toUpperCase() : 'N/A')}

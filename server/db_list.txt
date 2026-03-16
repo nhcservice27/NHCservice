@@ -1,0 +1,14 @@
+Databases found:
+- sample_mflix (120656 KB)
+    ↳ theaters: 1564 docs
+    ↳ users: 185 docs
+    ↳ embedded_movies: 3483 docs
+    ↳ movies: 21349 docs
+    ↳ sessions: 1 docs
+    ↳ comments: 41079 docs
+- test (632 KB)
+    ↳ users: 2 docs
+    ↳ products: 2 docs
+- admin (348 KB)
+- local (30097296 KB)
+    ↳ oplog.rs: 9 docs

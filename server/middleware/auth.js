@@ -1,41 +1,51 @@
+import jwt from 'jsonwebtoken';
 
 const protect = (req, res, next) => {
-    const authHeader = req.headers.authorization;
+    let token;
 
-    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+    // Check for token in cookies first, fallback to Authorization header
+    if (req.cookies && req.cookies.token) {
+        token = req.cookies.token;
+    } else if (req.headers.authorization && req.headers.authorization.startsWith('Bearer ')) {
+        token = req.headers.authorization.split(' ')[1];
+    }
+
+    if (!token) {
         return res.status(401).json({
             success: false,
             message: 'No authentication token provided'
         });
     }
 
-    const token = authHeader.split(' ')[1];
+    if (!process.env.JWT_SECRET) {
+        console.error("FATAL ERROR: JWT_SECRET is not defined.");
+        return res.status(500).json({ success: false, message: 'Internal server error' });
+    }
 
-    // Valid tokens: admin (nany:123) and delivery boy (ram@123:123)
-    const validTokens = [
-        'bmFueToxMjM=',           // btoa("nany:123") - admin
-        'cmFtQDEyMzoxMjM=',      // btoa("ram@123:123") - delivery boy Ram
-    ];
-
-    if (validTokens.includes(token)) {
+    try {
+        // Verify JWT token
+        const decoded = jwt.verify(token, process.env.JWT_SECRET);
+        req.user = decoded; // { userId, username, role }
         next();
-    } else {
-        // Also try to decode and validate as a username:password pair
-        try {
-            const decoded = Buffer.from(token, 'base64').toString('utf-8');
-            if (decoded.includes(':')) {
-                // Valid base64 credential pair - allow it
-                next();
-                return;
-            }
-        } catch (e) {
-            // Not valid base64
-        }
-        res.status(401).json({
+    } catch (error) {
+        return res.status(401).json({
             success: false,
-            message: 'Invalid authentication token'
+            message: 'Invalid or expired authentication token'
         });
     }
 };
 
-export { protect };
+// Role-based authorization middleware
+const authorizeRole = (...roles) => {
+    return (req, res, next) => {
+        if (!req.user || !roles.includes(req.user.role)) {
+            return res.status(403).json({
+                success: false,
+                message: 'Forbidden: You do not have permission to access this resource'
+            });
+        }
+        next();
+    };
+};
+
+export { protect, authorizeRole };

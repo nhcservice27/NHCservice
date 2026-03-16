@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
 import { Package, Truck, CheckCircle, LogOut, MapPin, Phone, User, Calendar, RefreshCw } from "lucide-react";
+import { formatDate } from "@/lib/utils";
 
 interface Order {
     _id: string;
@@ -37,7 +38,7 @@ export default function DeliveryDashboard() {
     const [orders, setOrders] = useState<Order[]>([]);
     const [loading, setLoading] = useState(true);
     const navigate = useNavigate();
-    const API_BASE_URL = '/api';
+    const API_BASE_URL = import.meta.env.VITE_API_URL || '/api';
     const deliveryBoyName = localStorage.getItem("adminUsername");
 
     useEffect(() => {
@@ -53,9 +54,8 @@ export default function DeliveryDashboard() {
     }, []);
 
     const checkAuth = () => {
-        const token = localStorage.getItem("deliveryToken");
         const role = localStorage.getItem("userRole");
-        if (!token || role !== "delivery") {
+        if (role !== "delivery") {
             navigate("/admin/login");
         }
     };
@@ -63,18 +63,8 @@ export default function DeliveryDashboard() {
     const loadOrders = async (showLoading = true) => {
         try {
             if (showLoading) setLoading(true);
-            const token = localStorage.getItem("deliveryToken") || localStorage.getItem("adminToken");
-            const name = localStorage.getItem("adminUsername");
-
-            if (!name) {
-                toast.error("User not identified");
-                return;
-            }
-
-            // Fetch orders assigned to this delivery boy
-            // Removed status=Shipped to show ALL assigned orders
             const res = await fetch(`${API_BASE_URL}/orders?deliveryBoy=${name}`, {
-                headers: { 'Authorization': `Bearer ${token}` }
+                credentials: 'include'
             });
 
             if (res.ok) {
@@ -113,13 +103,12 @@ export default function DeliveryDashboard() {
 
     const handleStatusUpdate = async (orderId: string, newStatus: string) => {
         try {
-            const token = localStorage.getItem("deliveryToken");
             const res = await fetch(`${API_BASE_URL}/orders/${orderId}/status`, {
                 method: 'PATCH',
                 headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${token}`
+                    'Content-Type': 'application/json'
                 },
+                credentials: 'include',
                 body: JSON.stringify({ status: newStatus })
             });
 
@@ -134,8 +123,8 @@ export default function DeliveryDashboard() {
         }
     };
 
-    const handleLogout = () => {
-        localStorage.removeItem("deliveryToken");
+    const handleLogout = async () => {
+        await fetch(`${API_BASE_URL}/auth/logout`, { method: 'POST', credentials: 'include' });
         localStorage.removeItem("userRole");
         localStorage.removeItem("adminUsername");
         navigate("/admin/login");
@@ -199,7 +188,7 @@ export default function DeliveryDashboard() {
                                             </div>
                                             <div className="flex items-center gap-1 text-xs text-gray-500">
                                                 <Calendar className="w-3 h-3" />
-                                                {new Date(order.createdAt).toLocaleDateString()}
+                                                {formatDate(order.createdAt)}
                                             </div>
                                         </div>
                                         {order.orderStatus === 'Shipped' && (

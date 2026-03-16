@@ -47,10 +47,41 @@ export function Overview({ stats, revenueData, products, loading }: OverviewProp
                     color="green"
                 />
                 <StatsCard
-                    title="Delivered"
-                    value={stats.orderStatus.delivered}
+                    title="Active Subscribers"
+                    value={stats.overview.activeSubscriptions || 0}
+                    icon={TrendingUp}
+                    color="pink"
+                    description={`${stats.overview.totalComplete || 0} Complete Plans`}
+                />
+            </div>
+
+            {/* Plan Distribution Stats */}
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                <StatsCard
+                    title="Starter Plans"
+                    value={stats.overview.totalStarter || 0}
+                    icon={Package}
+                    color="purple"
+                    description="One-time orders"
+                />
+                <StatsCard
+                    title="Complete Plans"
+                    value={stats.overview.totalComplete || 0}
                     icon={TrendingUp}
                     color="orange"
+                    description="Auto-phase orders"
+                />
+                <StatsCard
+                    title="Pending"
+                    value={stats.orderStatus.pending}
+                    icon={Clock}
+                    color="blue"
+                />
+                <StatsCard
+                    title="Delivered"
+                    value={stats.orderStatus.delivered}
+                    icon={CheckCircle}
+                    color="green"
                 />
             </div>
 

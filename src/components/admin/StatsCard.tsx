@@ -6,7 +6,7 @@ interface StatsCardProps {
     title: string;
     value: string | number;
     icon: LucideIcon;
-    color: "blue" | "purple" | "green" | "orange";
+    color: "blue" | "purple" | "green" | "orange" | "pink";
     description?: string;
 }
 
@@ -16,6 +16,7 @@ export function StatsCard({ title, value, icon: Icon, color, description }: Stat
         purple: { bg: "bg-purple-500", text: "text-purple-500", light: "bg-purple-50" },
         green: { bg: "bg-green-500", text: "text-green-500", light: "bg-green-50" },
         orange: { bg: "bg-orange-500", text: "text-orange-500", light: "bg-orange-50" },
+        pink: { bg: "bg-pink-500", text: "text-pink-500", light: "bg-pink-50" },
     };
 
     const style = colorStyles[color];

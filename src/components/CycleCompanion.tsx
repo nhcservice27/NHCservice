@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -10,6 +10,8 @@ import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "
 import { submitToGoogleSheet } from "@/lib/googleSheets";
 import { submitOrder } from "@/lib/orderService";
 import { Info, Home, MapPin, Package, Calendar } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
+import { useUser } from "@/context/UserContext";
 
 interface CycleResult {
   message: string;
@@ -21,19 +23,45 @@ interface CycleResult {
   B: number;
   D: number;
   BB: number;
+  total_days_passed: number;
+  starterPhase?: string;
+  isNextPhaseAdvance?: boolean;
+  current_phase_start?: string;
+  current_phase_end?: string;
+  next_phase_start?: string;
+  next_phase_end?: string;
+  next_delivery_date?: string;
+  shipping_date?: string;
+  complete_plan?: {
+    quantity: number;
+    weight: number;
+    price: number;
+    phase1_qty: number;
+    phase2_qty: number;
+  };
 }
+
+const API_BASE_URL = import.meta.env.VITE_API_URL || '/api';
 
 export const CycleCompanion = () => {
   const navigate = useNavigate();
+  const { customer, isLoggedIn } = useUser();
   const [lastPeriodDate, setLastPeriodDate] = useState("");
   const [averageCycle, setAverageCycle] = useState("");
   const [name, setName] = useState("");
+
+  useEffect(() => {
+    if (isLoggedIn && customer) {
+      setName(customer.name);
+    }
+  }, [isLoggedIn, customer]);
   const [result, setResult] = useState<CycleResult | null>(null);
   const [loading, setLoading] = useState(false);
   const [addressOpen, setAddressOpen] = useState(false);
 
   const [checkoutStep, setCheckoutStep] = useState<'phone' | 'details' | 'address'>('phone');
   const [checkingPhone, setCheckingPhone] = useState(false);
+  const [selectedPlan, setSelectedPlan] = useState<'starter' | 'complete'>('starter');
   const [age, setAge] = useState("");
 
   const [fullName, setFullName] = useState("");
@@ -58,7 +86,7 @@ export const CycleCompanion = () => {
 
     setCheckingPhone(true);
     try {
-      const response = await fetch('/api/check-customer', {
+      const response = await fetch(`${API_BASE_URL}/check-customer`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ phone })
@@ -143,18 +171,65 @@ export const CycleCompanion = () => {
       return;
     }
 
+    const isComplete = selectedPlan === 'complete';
     const orderData = {
       fullName: name,
       periodsStarted: lastPeriodDate,
       cycleLength: parseInt(averageCycle),
       phase: result.phase,
-      totalQuantity: result.quantity,
-      totalWeight: result.weight,
-      totalPrice: result.price_total,
-      message: result.message
+      totalQuantity: isComplete ? result.complete_plan?.quantity : result.quantity,
+      totalWeight: isComplete ? result.complete_plan?.weight : result.weight,
+      totalPrice: isComplete ? result.complete_plan?.price : result.price_total,
+      message: generateMessageForPlan(selectedPlan),
+      planType: selectedPlan,
+      nextDeliveryDate: isComplete ? result.next_delivery_date : null,
+      shippingDate: isComplete ? result.shipping_date : null,
+      autoPhase2: isComplete,
+      phase1Qty: isComplete ? result.complete_plan?.phase1_qty : result.quantity,
+      phase2Qty: isComplete ? result.complete_plan?.phase2_qty : 0
     };
 
     navigate("/checkout", { state: { orderData } });
+  };
+
+  const generateMessageForPlan = (plan: 'starter' | 'complete') => {
+    if (!result) return "";
+
+    // Original phase for complete plan, starterPhase for starter plan
+    const isPhase1Complete = result.phase === 'Phase-1';
+    const isPhase1Starter = (result.starterPhase || result.phase) === 'Phase-1';
+
+    const completeSeeds = isPhase1Complete ? 'Flax + Pumpkin' : 'Sunflower + Sesame';
+    const starterSeeds = isPhase1Starter ? 'Flax + Pumpkin' : 'Sunflower + Sesame';
+
+    const currentPhaseName = result.phase === 'Phase-1' ? 'Phase 1' : 'Phase 2';
+    const starterPhaseName = (result.starterPhase || result.phase) === 'Phase-1' ? 'Phase 1' : 'Phase 2';
+
+    const baseMessage = `Your last period started ${result.total_days_passed} days ago, so you are currently in **${currentPhaseName}** of your cycle (${result.current_phase_start} to ${result.current_phase_end}). 🌷`;
+
+    if (plan === 'starter') {
+      const quantityText = result.isNextPhaseAdvance
+        ? `Since this phase is almost over, we're getting you ready for the next one! We will send you ${result.quantity} ${starterPhaseName} Laddus (${starterSeeds}) for your upcoming ${starterPhaseName} (${result.next_phase_start} to ${result.next_phase_end}).`
+        : `To support your body right now, we will send you ${result.quantity} ${starterPhaseName} Laddus (${starterSeeds}) to cover the rest of this current phase.`;
+
+      const note = `\n\n*Note: Your actual cycle may vary based on your lifestyle and body.*`;
+
+      return `Hi ${name} ma’am! 🌸\n\n${baseMessage}\n\n${quantityText}${note}`;
+    } else {
+      const q1 = isPhase1Complete ? result.complete_plan?.phase1_qty : result.complete_plan?.phase2_qty;
+      const q2 = isPhase1Complete ? result.complete_plan?.phase2_qty : result.complete_plan?.phase1_qty;
+      const p1 = isPhase1Complete ? '1' : '2';
+      const p2 = isPhase1Complete ? '2' : '1';
+
+      let preamble = "";
+      if (result.isNextPhaseAdvance) {
+        preamble = `Since this phase is almost over, we're starting your complete 30-day supply from your NEXT phase to keep things balanced! (${starterPhaseName} begins on ${result.next_phase_start}).\n\n`;
+      }
+
+      const note = `\n\n*Note: Your actual cycle may vary based on your lifestyle and body.*`;
+
+      return `Hi ${name} ma’am! 🌸\n\n${baseMessage}\n\n${preamble}✨ **Complete Balance Plan:**\nWe will send you ${q1} Phase-${p1} laddus now.\nThen, we will automatically deliver ${q2} Phase-${p2} laddus on ${new Date(result.next_delivery_date!).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })}.\n\nStatus: Subscription Active ✅ | 10% Discount Applied 💰${note}`;
+    }
   };
 
   const handleConfirmAddress = () => {
@@ -280,59 +355,113 @@ export const CycleCompanion = () => {
                 {/* Header Section */}
                 <div className="bg-pink-300 p-6 text-white text-left">
                   <h3 className="text-2xl font-bold font-serif mb-1">Hi {name} ma'am! 🌸</h3>
-                  <p className="opacity-90">Today is Day {result.A} of your {result.BB}-day cycle.</p>
+                  <p className="opacity-95 text-sm leading-snug">
+                    It has been {result.total_days_passed} days since your last period start.
+                    Based on a {result.BB}-day cycle, you may be in Day {result.A} of a new cycle ({result.phase}).
+                  </p>
                 </div>
 
                 <div className="p-6 flex-grow flex flex-col gap-6">
                   {/* Phase Indicator */}
                   <div className="flex items-center gap-3">
-                    <div className={`w-3 h-3 rounded-full ${getDisplayPhase(result.message) === 'Phase-1' ? 'bg-pink-400' : 'bg-purple-400'}`}></div>
+                    <div className={`w-3 h-3 rounded-full ${result.phase === 'Phase-1' ? 'bg-pink-400' : 'bg-purple-400'}`}></div>
                     <h4 className="text-lg font-bold text-gray-800 font-serif">
-                      Current: {getDisplayPhase(result.message) === 'Phase-1' ? 'Follicular Phase' : 'Luteal Phase'}
+                      Current: {result.phase === 'Phase-1' ? 'Follicular Phase' : 'Luteal Phase'}
                     </h4>
                   </div>
 
-                  {/* Description Text */}
-                  <p className="text-gray-600 leading-relaxed text-sm">
-                    You are currently in your <span className="font-semibold">{getDisplayPhase(result.message) === 'Phase-1' ? 'Follicular Phase (Phase-1)' : 'Luteal Phase (Phase-2)'}</span>.
-                    This phase is supported by <span className="font-medium text-pink-600">{getDisplayPhase(result.message) === 'Phase-1' ? 'Flax & Pumpkin Seeds' : 'Sesame & Sunflower Seeds'}</span>.
-                    Your personalized recommendation consists of {result.quantity} laddus to balance your hormones for the remainder of this phase.
-                  </p>
+                  {/* Plan Selection Tabs */}
+                  <div className="grid grid-cols-2 gap-2 bg-pink-50/50 p-1 rounded-xl">
+                    <button
+                      onClick={() => setSelectedPlan('starter')}
+                      className={`py-2 px-3 rounded-lg text-sm font-medium transition-all ${selectedPlan === 'starter' ? 'bg-white shadow-sm text-pink-600' : 'text-gray-500 hover:text-gray-700'}`}
+                    >
+                      🌸 Starter Plan
+                    </button>
+                    <div className="relative">
+                      <div className="absolute -top-3 left-1/2 -translate-x-1/2 bg-gradient-to-r from-pink-400 to-purple-400 text-white text-[10px] font-bold px-2 py-0.5 rounded-full shadow-sm whitespace-nowrap z-10">
+                        Recommended
+                      </div>
+                      <button
+                        onClick={() => setSelectedPlan('complete')}
+                        className={`w-full h-full py-2 px-3 rounded-lg text-sm font-medium transition-all ${selectedPlan === 'complete' ? 'bg-white shadow-sm text-pink-600' : 'text-gray-500 hover:text-gray-700'}`}
+                      >
+                        🌼 Complete Plan
+                      </button>
+                    </div>
+                  </div>
 
-                  {/* Cards Row */}
-                  <div className="grid grid-cols-2 gap-4 mt-auto">
-                    {/* Summary Card */}
-                    <div className="bg-pink-50/50 rounded-xl p-4 border border-pink-100 flex flex-col gap-2">
-                      <div className="flex items-center gap-2 text-pink-500 mb-1">
-                        <Package className="w-4 h-4" />
-                        <span className="font-bold text-sm text-gray-800">Order Summary</span>
-                      </div>
-                      <div className="flex justify-between text-xs text-gray-600">
-                        <span>Phase Type:</span>
-                        <span className="font-semibold text-gray-900">{getDisplayPhase(result.message)}</span>
-                      </div>
-                      <div className="flex justify-between text-xs text-gray-600">
-                        <span>Quantity:</span>
-                        <span className="font-semibold text-gray-900">{result.quantity} Laddus</span>
-                      </div>
-                      <div className="flex justify-between text-xs text-gray-600">
-                        <span>Net Weight:</span>
-                        <span className="font-semibold text-gray-900">{result.weight}g</span>
-                      </div>
+                  {/* Plan Content */}
+                  <div className="space-y-4">
+                    <div className="bg-white/80 rounded-xl p-4 border border-pink-100">
+                      <h5 className="font-bold text-gray-800 mb-2">
+                        {selectedPlan === 'starter' ? 'Cycle Starter Plan' : 'Complete Balance Plan'}
+                      </h5>
+                      <p className="text-sm text-gray-600 leading-relaxed whitespace-pre-line">
+                        {generateMessageForPlan(selectedPlan)}
+                      </p>
                     </div>
 
-                    {/* Price Card */}
-                    <div className="bg-pink-50/30 rounded-xl p-4 border border-pink-100 flex flex-col items-center justify-center text-center">
-                      <span className="text-xs font-bold text-gray-500 uppercase tracking-wide">Total Price</span>
-                      <span className="text-3xl font-bold text-pink-400 my-1">₹{result.price_total}</span>
-                      <span className="text-[10px] text-gray-400">Free Delivery (Limited Time)</span>
+                    {/* Order Summary Card (Matching user screenshot) */}
+                    <div className="bg-pink-50/50 rounded-2xl p-6 border border-pink-100 shadow-sm">
+                      <div className="flex items-center gap-3 mb-6">
+                        <div className="bg-white p-2 rounded-lg shadow-sm">
+                          <Package className="w-5 h-5 text-pink-500" />
+                        </div>
+                        <h5 className="font-extrabold text-gray-800 text-lg">Order Summary</h5>
+                      </div>
+
+                      <div className="space-y-4">
+                        <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-1">
+                          <span className="text-gray-500 font-medium">Phase Type:</span>
+                          <span className="font-bold text-gray-800">
+                            {selectedPlan === 'complete' ? 'Phase 1 + Phase 2' : (result.starterPhase || result.phase)}
+                          </span>
+                        </div>
+
+                        <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-1">
+                          <span className="text-gray-500 font-medium">Quantity:</span>
+                          <span className="font-bold text-gray-800">
+                            {selectedPlan === 'complete'
+                              ? `${result.complete_plan?.phase1_qty} Laddus + ${result.complete_plan?.phase2_qty} Laddus`
+                              : `${result.quantity} Laddus`
+                            }
+                          </span>
+                        </div>
+
+                        <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-1">
+                          <span className="text-gray-500 font-medium">Net Weight:</span>
+                          <span className="font-bold text-gray-800">
+                            {selectedPlan === 'complete' ? result.complete_plan?.weight : result.weight}g
+                          </span>
+                        </div>
+
+                        {/* Pricing and secondary info integrated into the summary for a cleaner look */}
+                        <div className="pt-4 border-t border-pink-100 mt-2 flex justify-between items-end">
+                          <div className="space-y-1">
+                            <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider block">Total Amount</span>
+                            <span className="text-2xl font-black text-pink-500">
+                              ₹{selectedPlan === 'complete' ? result.complete_plan?.price : result.price_total}
+                            </span>
+                          </div>
+                          <div className="text-right">
+                            {selectedPlan === 'complete' ? (
+                              <Badge className="bg-green-100 text-green-700 hover:bg-green-100 border-none font-bold text-[10px]">
+                                10% SAVINGS
+                              </Badge>
+                            ) : (
+                              <span className="text-[10px] text-gray-400 font-medium italic">One-time purchase</span>
+                            )}
+                          </div>
+                        </div>
+                      </div>
                     </div>
                   </div>
 
                   {/* Action Button */}
                   <Button
                     onClick={handleBuy}
-                    className="w-full bg-pink-300 hover:bg-pink-400 text-white font-semibold py-6 text-lg rounded-xl shadow-md transition-all mt-2"
+                    className="w-full bg-pink-500 hover:bg-pink-600 text-white font-semibold py-6 text-lg rounded-xl shadow-lg shadow-pink-200 transition-all mt-auto"
                   >
                     Proceed to Order
                   </Button>

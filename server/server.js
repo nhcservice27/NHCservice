@@ -1,14 +1,27 @@
+import dotenv from 'dotenv';
+// Load environment variables immediately
+dotenv.config();
+
+// Ensure JWT secret is present before continuing
+if (!process.env.JWT_SECRET) {
+  console.error("FATAL ERROR: JWT_SECRET is not defined in environment variables.");
+  process.exit(1);
+}
+
 import express from 'express';
 import cors from 'cors';
-import dotenv from 'dotenv';
 import bodyParser from 'body-parser';
+import mongoose from 'mongoose';
+import rateLimit from 'express-rate-limit';
+import helmet from 'helmet';
+import mongoSanitize from 'express-mongo-sanitize';
+import cookieParser from 'cookie-parser';
 import connectDB from './config/database.js';
 import orderRoutes from './routes/orderRoutes.js';
 import customerRoutes from './routes/customerRoutes.js';
+import ingredientRoutes from './routes/ingredientRoutes.js';
+import authRoutes from './routes/authRoutes.js';
 import { startTelegramListener } from './utils/telegramListener.js';
-
-// Load environment variables
-dotenv.config();
 
 // Initialize Express app
 const app = express();
@@ -21,28 +34,58 @@ const allowedOrigins = process.env.ALLOWED_ORIGINS?.split(',') || [
   'http://localhost:8080',
   'http://localhost:8081',
   'https://remarkable-tarsier-af2904.netlify.app',
-  'https://cycle-harmony-v2.netlify.app'
+  'https://cycle-harmony-v2.netlify.app',
+  'https://nhcservice.online'
 ];
 app.use(cors({
   origin: function (origin, callback) {
-    // Allow requests with no origin (like mobile apps or curl requests)
-    if (!origin) return callback(null, true);
-
-    if (allowedOrigins.indexOf(origin) === -1) {
+    if (!origin || allowedOrigins.indexOf(origin) !== -1) {
+      return callback(null, true);
+    } else {
       const msg = 'The CORS policy for this site does not allow access from the specified Origin.';
       return callback(new Error(msg), false);
     }
-    return callback(null, true);
   },
   credentials: true
 }));
 
-app.use(bodyParser.json());
-app.use(bodyParser.urlencoded({ extended: true }));
+// Apply global security middleware
+app.use(helmet());
+app.use(mongoSanitize());
+app.use(cookieParser());
+
+// Apply payload limits to prevent large payload attacks
+app.use(express.json({ limit: '10kb' }));
+app.use(express.urlencoded({ extended: true, limit: '10kb' }));
+
+// Rate Limiting — Issue #7 fix
+const globalLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 1000, // Increased from 100
+  message: { success: false, message: 'Too many requests, please try again later.' }
+});
+
+const strictLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 100, // Increased from 10
+  message: { success: false, message: 'Too many requests, please try again later.' }
+});
+
+const authLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 20, // Increased from 5
+  message: { success: false, message: 'Too many login attempts, please try again later.' }
+});
+
+app.use(globalLimiter);
+app.use('/api/orders', strictLimiter);
+app.use('/api/auth', authLimiter);
 
 // Routes
+app.use('/api', authRoutes);
 app.use('/api', orderRoutes);
 app.use('/api', customerRoutes);
+app.use('/api', ingredientRoutes);
 
 // Health check endpoint
 app.get('/health', (req, res) => {
@@ -76,11 +119,16 @@ app.get('/', (req, res) => {
 
 // Error handling middleware
 app.use((err, req, res, next) => {
-  console.error(err.stack);
+  // Log full error stack on the server
+  console.error("Server Error Log:", err.stack);
+  import('fs').then(fs => fs.appendFileSync('error.log', new Date().toISOString() + ' ' + err.stack + '\\n')).catch(e => {});
+  
+  // Return a generic error message to clients to avoid leaking sensitive information
+  const isDev = process.env.NODE_ENV === 'development';
   res.status(500).json({
     success: false,
-    message: 'Something went wrong!',
-    error: process.env.NODE_ENV === 'development' ? err.message : undefined
+    message: 'An internal server error occurred!',
+    error: isDev ? err.message : 'Internal Server Error'
   });
 });
 

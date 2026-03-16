@@ -1,0 +1,38 @@
+{
+  "success": true,
+  "message": "Order created successfully",
+  "data": {
+    "fullName": "API Test User",
+    "customerId": "#A001",
+    "orderId": "#A001A02",
+    "phone": "5555555555",
+    "email": "apitest@example.com",
+    "periodsStarted": "2026-03-09T14:06:01.795Z",
+    "cycleLength": 28,
+    "phase": "Phase-1",
+    "totalQuantity": 1,
+    "totalWeight": 30,
+    "totalPrice": 45,
+    "address": {
+      "house": "123 Test St",
+      "area": "Test Area",
+      "landmark": "Near Test Park",
+      "pincode": "500001",
+      "mapLink": "",
+      "label": "Home"
+    },
+    "paymentMethod": "Cash on Delivery",
+    "orderStatus": "Pending",
+    "planType": "starter",
+    "subscriptionStatus": "completed",
+    "autoPhase2": false,
+    "deliveryDate": "2026-03-10T14:06:03.889Z",
+    "message": "This is a test order via API script.",
+    "stockWarning": "No ingredients found for Phase-1.",
+    "_id": "69aed3cb24f03bf772e3c8c7",
+    "orderDate": "2026-03-09T14:06:03.891Z",
+    "createdAt": "2026-03-09T14:06:03.896Z",
+    "updatedAt": "2026-03-09T14:06:03.896Z",
+    "__v": 0
+  }
+}

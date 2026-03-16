@@ -1,0 +1,6 @@
+Connected to DB: test
+Collection 'orders' has 0 documents.
+Collection 'customers' has 0 documents.
+Collection 'users' has 2 documents.
+Collection 'products' has 2 documents.
+Collection 'ingredients' has 0 documents.

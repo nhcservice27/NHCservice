@@ -1,8 +1,10 @@
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { toast } from "sonner";
 import {
     ShoppingCart, Search, Filter, Download,
-    MapPin, MessageSquare, Edit, Trash2, Check, MessageCircle, MoreHorizontal, Truck, User
+    MapPin, MessageSquare, Edit, Trash2, Check, MessageCircle, MoreHorizontal, Truck, User,
+    AlertTriangle, Calendar, XCircle, Send, Mail
 } from "lucide-react";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -12,6 +14,7 @@ import { StatusBadge } from "./StatusBadge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
+import { formatDate } from "@/lib/utils";
 
 interface OrdersProps {
     orders: any[];
@@ -23,11 +26,13 @@ interface OrdersProps {
     handleDeleteClick: (id: string) => void;
     handleEditClick: (order: any) => void;
     handleWhatsAppSend: (order: any) => void;
+    handleGmailSend: (order: any) => void;
     handleAssignDeliveryClick: (order: any) => void;
     sentMessages: Set<string>;
     handleExportCSV: () => void;
     handleEmailNotify: (id: string) => void;
     sentEmails: Set<string>;
+    customers: any[];
 }
 
 const statusOptions = [
@@ -38,29 +43,111 @@ const statusOptions = [
     { label: "Shipped", value: "Shipped" },
     { label: "Delivered", value: "Delivered" },
     { label: "Cancelled", value: "Cancelled" },
+    { label: "Not Approved", value: "Not Approved" },
+    { label: "📅 Upcoming", value: "Upcoming" },
 ];
+
+function StockBadge({ orderId }: { orderId: string }) {
+    const [stockStatus, setStockStatus] = useState<{ hasStock: boolean, loading: boolean }>({ hasStock: true, loading: true });
+    const API_BASE = '/api';
+
+    useEffect(() => {
+        const checkStock = async () => {
+            try {
+                const res = await fetch(`${API_BASE}/ingredients/check-order/${orderId}`, {
+                    credentials: 'include'
+                });
+                const data = await res.json();
+                if (data.success) {
+                    setStockStatus({ hasStock: data.hasStock, loading: false });
+                }
+            } catch (err) {
+                setStockStatus({ hasStock: true, loading: false });
+            }
+        };
+        checkStock();
+    }, [orderId]);
+
+    if (stockStatus.loading) return <Badge variant="outline" className="h-4 w-12 animate-pulse bg-gray-50 text-[1px]">...</Badge>;
+
+    return stockStatus.hasStock ? (
+        <Badge className="bg-green-100 text-green-700 border-green-200 flex items-center gap-1 text-[10px] h-5">
+            <Check className="w-2.5 h-2.5" /> Stock OK
+        </Badge>
+    ) : (
+        <Badge variant="destructive" className="flex items-center gap-1 text-[10px] h-5 animate-pulse">
+            <AlertTriangle className="w-2.5 h-2.5" /> Out of Stock (Grams)
+        </Badge>
+    );
+}
+
+const API_BASE_URL = import.meta.env.VITE_API_URL || '/api';
 
 export function Orders({
     orders, orderFilter, setOrderFilter, searchQuery, setSearchQuery, handleStatusUpdate,
-    handleDeleteClick, handleEditClick, handleWhatsAppSend, handleAssignDeliveryClick,
-    sentMessages, handleExportCSV, handleEmailNotify, sentEmails
+    handleDeleteClick, handleEditClick, handleWhatsAppSend, handleGmailSend, handleAssignDeliveryClick,
+    sentMessages, handleExportCSV, handleEmailNotify, sentEmails, customers
 }: OrdersProps) {
 
     const [paymentFilter, setPaymentFilter] = useState("all");
+    const [planFilter, setPlanFilter] = useState("all");
     const [isDateDialogOpen, setIsDateDialogOpen] = useState(false);
     const [selectedOrderId, setSelectedOrderId] = useState<string | null>(null);
     const [tempStatus, setTempStatus] = useState<string>("");
     const [deliveryDate, setDeliveryDate] = useState<string>(new Date().toISOString().split('T')[0]);
 
+    // New Order State
+    const [isNewOrderDialogOpen, setIsNewOrderDialogOpen] = useState(false);
+    const [customerSearch, setCustomerSearch] = useState("");
+    const [newOrderForm, setNewOrderForm] = useState({
+        customerId: "",
+        fullName: "",
+        phone: "",
+        email: "",
+        age: "",
+        phase: "Phase-1",
+        totalQuantity: 12,
+        totalPrice: 451,
+        address: {
+            house: "",
+            area: "",
+            landmark: "",
+            pincode: "",
+            label: "Home"
+        },
+        paymentMethod: "Cash on Delivery",
+        message: "",
+        periodsStarted: new Date().toISOString().split('T')[0],
+        cycleLength: 30
+    });
+
     const filteredOrders = orders.filter(o => {
         const matchesStatus = orderFilter === 'all' || o.orderStatus === orderFilter;
         const matchesPayment = paymentFilter === 'all' || o.paymentMethod === paymentFilter;
+        const customerProfile = customers.find(c => c.phone === o.phone);
+        const currentPlan = customerProfile?.planType || o.planType;
+        const matchesPlan = planFilter === 'all' || currentPlan === planFilter;
         const matchesSearch = !searchQuery ||
             (o.fullName && o.fullName.toLowerCase().includes(searchQuery.toLowerCase())) ||
             (o.phone && o.phone.includes(searchQuery)) ||
             (o.orderId && o.orderId.toLowerCase().includes(searchQuery.toLowerCase()));
 
-        return matchesStatus && matchesPayment && matchesSearch;
+        if (orderFilter === 'Upcoming') {
+            const upcomingDate = o.nextDeliveryDate || o.deliveryDate;
+            if (!upcomingDate) return false;
+
+            const nextDel = new Date(upcomingDate);
+            nextDel.setHours(0, 0, 0, 0);
+
+            const today = new Date();
+            today.setHours(0, 0, 0, 0);
+
+            // Show all future orders in "Upcoming", not just next 14 days
+            const matchesUpcoming = nextDel >= today;
+            return matchesUpcoming && matchesPayment && matchesSearch && matchesPlan;
+        }
+
+        return matchesStatus && matchesPayment && matchesSearch && matchesPlan;
     });
 
     const [expandedOrderId, setExpandedOrderId] = useState<string | null>(null);
@@ -84,6 +171,61 @@ export function Orders({
             handleStatusUpdate(selectedOrderId, tempStatus, deliveryDate);
             setIsDateDialogOpen(false);
             setSelectedOrderId(null);
+        }
+    };
+
+    const handleCustomerSelect = (customer: any) => {
+        setNewOrderForm(prev => ({
+            ...prev,
+            customerId: customer.customerId || customer._id,
+            fullName: customer.fullName || customer.name || "",
+            phone: customer.phone || "",
+            email: customer.email || "",
+            age: customer.age || "",
+            address: {
+                house: customer.address?.house || "",
+                area: customer.address?.area || "",
+                landmark: customer.address?.landmark || "",
+                pincode: customer.address?.pincode || "",
+                label: customer.address?.label || "Home"
+            }
+        }));
+        setCustomerSearch("");
+    };
+
+    const handleCreateSubmit = async (status: string = 'Confirmed') => {
+        const orderData = {
+            ...newOrderForm,
+            totalWeight: newOrderForm.totalQuantity * 30,
+            orderStatus: status,
+            deliveryDate: deliveryDate
+        };
+
+        try {
+            
+            const res = await fetch(`${API_BASE_URL}/orders`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' }, credentials: 'include',
+                body: JSON.stringify(orderData)
+            });
+            const data = await res.json();
+            if (data.success) {
+                toast.success(status === 'Requested' ? "Request sent to customer!" : "Order created successfully!");
+
+                if (status === 'Requested') {
+                    // Logic to trigger Email/WhatsApp for the newly created request
+                    handleWhatsAppSend(data.data);
+                    handleGmailSend(data.data);
+                    handleEmailNotify(data.data._id);
+                }
+
+                setIsNewOrderDialogOpen(false);
+                window.location.reload();
+            } else {
+                toast.error(data.message || "Failed to process order");
+            }
+        } catch (err) {
+            toast.error("Error processing order");
         }
     };
 
@@ -131,12 +273,27 @@ export function Orders({
                     </div>
 
                     <div className="flex items-center gap-2 w-full md:w-auto">
+                        {/* Plan Filter */}
+                        <Select value={planFilter} onValueChange={setPlanFilter}>
+                            <SelectTrigger className="w-full md:w-[130px] bg-gray-50 border-gray-100 h-10 rounded-lg">
+                                <div className="flex items-center gap-2">
+                                    <Filter className="w-3.5 h-3.5 text-gray-400" />
+                                    <SelectValue placeholder="Plan" />
+                                </div>
+                            </SelectTrigger>
+                            <SelectContent>
+                                <SelectItem value="all">All Plans</SelectItem>
+                                <SelectItem value="starter">Starter Plan</SelectItem>
+                                <SelectItem value="complete">Complete Plan</SelectItem>
+                            </SelectContent>
+                        </Select>
+
                         {/* Payment Method Filter */}
                         <Select value={paymentFilter} onValueChange={setPaymentFilter}>
                             <SelectTrigger className="w-full md:w-[160px] bg-gray-50 border-gray-100 h-10 rounded-lg">
                                 <div className="flex items-center gap-2">
                                     <Filter className="w-3.5 h-3.5 text-gray-400" />
-                                    <SelectValue placeholder="Payment Method" />
+                                    <SelectValue placeholder="Payment" />
                                 </div>
                             </SelectTrigger>
                             <SelectContent>
@@ -150,6 +307,11 @@ export function Orders({
                         <Button onClick={handleExportCSV} variant="outline" className="h-10 border-gray-100 hover:bg-gray-50 text-gray-700 rounded-lg shrink-0">
                             <Download className="w-4 h-4 mr-2" />
                             <span className="hidden sm:inline">Export</span>
+                        </Button>
+
+                        <Button onClick={() => setIsNewOrderDialogOpen(true)} className="h-10 bg-pink-500 hover:bg-pink-600 text-white rounded-lg shrink-0 shadow-md shadow-pink-100 font-bold">
+                            <ShoppingCart className="w-4 h-4 mr-2" />
+                            New Order
                         </Button>
                     </div>
                 </div>
@@ -170,6 +332,129 @@ export function Orders({
                     ))}
                 </div>
             </div>
+
+            {/* Manual Order Creation Dialog */}
+            <Dialog open={isNewOrderDialogOpen} onOpenChange={setIsNewOrderDialogOpen}>
+                <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+                    <DialogHeader>
+                        <DialogTitle className="flex items-center gap-2">
+                            <ShoppingCart className="w-5 h-5 text-pink-500" />
+                            Place New Order
+                        </DialogTitle>
+                        <DialogDescription>
+                            Manually create and confirm an order for an existing customer.
+                        </DialogDescription>
+                    </DialogHeader>
+
+                    <div className="grid gap-6 py-4">
+                        {/* Customer Selection */}
+                        <div className="space-y-3">
+                            <Label className="text-pink-600 font-bold">Step 1: Select Customer</Label>
+                            <div className="relative">
+                                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                                <Input
+                                    placeholder="Search existing customers by name or phone..."
+                                    className="pl-10"
+                                    value={customerSearch}
+                                    onChange={(e) => setCustomerSearch(e.target.value)}
+                                />
+                            </div>
+
+                            {customerSearch && (
+                                <div className="border rounded-lg max-h-40 overflow-y-auto bg-gray-50 divide-y">
+                                    {customers.filter(c =>
+                                        c.fullName?.toLowerCase().includes(customerSearch.toLowerCase()) ||
+                                        c.phone?.includes(customerSearch)
+                                    ).map(c => (
+                                        <div
+                                            key={c._id}
+                                            className="p-3 hover:bg-pink-50 cursor-pointer flex justify-between items-center"
+                                            onClick={() => handleCustomerSelect(c)}
+                                        >
+                                            <div>
+                                                <p className="font-bold text-sm">{c.fullName || c.name}</p>
+                                                <p className="text-xs text-gray-500">{c.phone}</p>
+                                            </div>
+                                            <Button size="sm" variant="ghost" className="text-pink-500">Select</Button>
+                                        </div>
+                                    ))}
+                                    {customers.filter(c =>
+                                        c.fullName?.toLowerCase().includes(customerSearch.toLowerCase()) ||
+                                        c.phone?.includes(customerSearch)
+                                    ).length === 0 && (
+                                            <p className="p-4 text-center text-gray-400 text-sm">No customers found</p>
+                                        )}
+                                </div>
+                            )}
+
+                            {newOrderForm.fullName && (
+                                <div className="bg-green-50 border border-green-100 p-3 rounded-lg flex justify-between items-center">
+                                    <div>
+                                        <p className="text-[10px] text-green-600 font-bold uppercase tracking-wider">Selected Customer</p>
+                                        <p className="font-bold">{newOrderForm.fullName} ({newOrderForm.phone})</p>
+                                    </div>
+                                    <Button size="sm" variant="ghost" className="text-gray-400" onClick={() => setNewOrderForm({ ...newOrderForm, fullName: "", phone: "" })}>Change</Button>
+                                </div>
+                            )}
+                        </div>
+
+                        {/* Order Details */}
+                        <div className="space-y-4">
+                            <Label className="text-pink-600 font-bold">Step 2: Order Parameters</Label>
+                            <div className="grid grid-cols-2 gap-4">
+                                <div className="space-y-2">
+                                    <Label>Phase</Label>
+                                    <Select value={newOrderForm.phase} onValueChange={(v) => setNewOrderForm({ ...newOrderForm, phase: v })}>
+                                        <SelectTrigger><SelectValue /></SelectTrigger>
+                                        <SelectContent>
+                                            <SelectItem value="Phase-1">Phase 1 (Menstrual)</SelectItem>
+                                            <SelectItem value="Phase-2">Phase 2 (Follicular)</SelectItem>
+                                        </SelectContent>
+                                    </Select>
+                                </div>
+                                <div className="space-y-2">
+                                    <Label>Quantity (Laddus)</Label>
+                                    <Input
+                                        type="number"
+                                        value={newOrderForm.totalQuantity}
+                                        onChange={(e) => setNewOrderForm({ ...newOrderForm, totalQuantity: parseInt(e.target.value) })}
+                                    />
+                                </div>
+                            </div>
+                            <div className="grid grid-cols-2 gap-4">
+                                <div className="space-y-2">
+                                    <Label>Total Price (₹)</Label>
+                                    <Input
+                                        type="number"
+                                        value={newOrderForm.totalPrice}
+                                        onChange={(e) => setNewOrderForm({ ...newOrderForm, totalPrice: parseInt(e.target.value) })}
+                                    />
+                                </div>
+                                <div className="space-y-2">
+                                    <Label>Expected Delivery</Label>
+                                    <Input
+                                        type="date"
+                                        value={deliveryDate}
+                                        onChange={(e) => setDeliveryDate(e.target.value)}
+                                    />
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <DialogFooter className="flex flex-col sm:flex-row gap-2">
+                        <Button variant="outline" onClick={() => setIsNewOrderDialogOpen(false)} className="sm:mr-auto">Cancel</Button>
+                        <Button
+                            onClick={() => handleCreateSubmit('Requested')}
+                            disabled={!newOrderForm.phone}
+                            className="bg-pink-500 hover:bg-pink-600 text-white font-bold shadow-lg shadow-pink-100"
+                        >
+                            <Send className="w-4 h-4 mr-2" />
+                            Send Confirmation Request
+                        </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
 
             {/* Orders List */}
             <div className="space-y-4">
@@ -196,8 +481,8 @@ export function Orders({
                                                     variant="outline"
                                                     onClick={() => handleEmailNotify(order._id)}
                                                     className={`h-9 w-9 p-0 shadow-sm transition-all ${sentEmails.has(order._id)
-                                                            ? "border-green-200 bg-green-50 text-green-600 hover:bg-green-100"
-                                                            : "border-pink-200 text-pink-500 hover:bg-pink-50 hover:text-pink-600"
+                                                        ? "border-green-200 bg-green-50 text-green-600 hover:bg-green-100"
+                                                        : "border-pink-200 text-pink-500 hover:bg-pink-50 hover:text-pink-600"
                                                         }`}
                                                     title={sentEmails.has(order._id) ? "Email Sent (Click to resend)" : "Send Email Notification"}
                                                 >
@@ -209,6 +494,30 @@ export function Orders({
                                             {order.deliveryBoy && (
                                                 <Badge variant="secondary" className="bg-blue-50 text-blue-700 border-blue-100 flex items-center gap-1">
                                                     <Truck className="w-3 h-3" /> {order.deliveryBoy}
+                                                </Badge>
+                                            )}
+
+                                            {/* Stock Availability Badge */}
+                                            {order.orderStatus === 'Pending' || order.orderStatus === 'Processing' ? (
+                                                <StockBadge orderId={order._id} />
+                                            ) : null}
+
+                                            {/* Plan Type Badge */}
+                                            {(() => {
+                                                const customerProfile = customers.find(c => c.phone === order.phone);
+                                                const displayPlanType = customerProfile?.planType || order.planType;
+                                                if (!displayPlanType) return null;
+                                                return (
+                                                    <Badge className={`${displayPlanType === 'complete' ? 'bg-purple-100 text-purple-700' : 'bg-pink-100 text-pink-700'} border-none font-bold text-[10px]`}>
+                                                        {displayPlanType === 'complete' ? '🌼 Complete' : '🌸 Starter'}
+                                                    </Badge>
+                                                );
+                                            })()}
+
+                                            {/* Stock Warning Alert */}
+                                            {order.stockWarning && (
+                                                <Badge variant="destructive" className="bg-red-100 text-red-700 border-red-200 animate-pulse flex items-center gap-1 font-bold text-[10px]">
+                                                    <XCircle className="w-3 h-3" /> STOCK WARNING
                                                 </Badge>
                                             )}
                                         </div>
@@ -235,6 +544,22 @@ export function Orders({
                                                 <MapPin className="w-3.5 h-3.5 text-gray-400" />
                                                 <span className="truncate max-w-[200px]">{order.address?.area}, {order.address?.pincode}</span>
                                             </div>
+                                            {order.address?.mapLink && (
+                                                <a href={order.address.mapLink} target="_blank" rel="noreferrer" className="flex items-center gap-1 bg-pink-50 text-pink-700 px-2 py-1 rounded hover:bg-pink-100 transition-colors">
+                                                    <MapPin className="w-3.5 h-3.5" />
+                                                    <span className="font-bold underline">View on Map</span>
+                                                </a>
+                                            )}
+                                            {order.deliveryDate && (
+                                                <div className="flex items-center gap-1 bg-blue-50 px-2 py-1 rounded text-blue-700 font-bold">
+                                                    <span>Delivery: {formatDate(order.deliveryDate)}</span>
+                                                </div>
+                                            )}
+                                            {order.nextDeliveryDate && (
+                                                <div className="flex items-center gap-1 bg-green-50 px-2 py-1 rounded text-green-700 font-bold">
+                                                    <span>Next Delivery: {formatDate(order.nextDeliveryDate)}</span>
+                                                </div>
+                                            )}
                                         </div>
                                     </div>
 
@@ -242,7 +567,7 @@ export function Orders({
                                     <div className="flex flex-col items-end gap-4 justify-between min-w-[200px]">
                                         <div className="hidden md:block text-right">
                                             <p className="text-2xl font-extrabold text-green-600">₹{order.totalPrice}</p>
-                                            <p className="text-xs text-gray-400">{new Date(order.createdAt).toLocaleDateString()}</p>
+                                            <p className="text-xs text-gray-400">{formatDate(order.createdAt)}</p>
                                         </div>
 
                                         <div className="flex items-center gap-2 w-full md:w-auto flex-wrap justify-end">
@@ -260,6 +585,7 @@ export function Orders({
                                                     <SelectItem value="Shipped">Shipped</SelectItem>
                                                     <SelectItem value="Delivered">Delivered</SelectItem>
                                                     <SelectItem value="Cancelled">Cancelled</SelectItem>
+                                                    <SelectItem value="Not Approved">Not Approved</SelectItem>
                                                 </SelectContent>
                                             </Select>
 
@@ -292,6 +618,16 @@ export function Orders({
                                                 title="Send WhatsApp Update"
                                             >
                                                 {sentMessages.has(order._id) ? <Check className="w-4 h-4" /> : <MessageCircle className="w-4 h-4" />}
+                                            </Button>
+
+                                            <Button
+                                                size="sm"
+                                                variant="outline"
+                                                className="h-9 w-9 p-0 text-red-500 hover:text-red-600 hover:bg-red-50"
+                                                onClick={() => handleGmailSend(order)}
+                                                title="Send via Gmail"
+                                            >
+                                                <Mail className="w-4 h-4" />
                                             </Button>
 
                                             <Button

@@ -7,36 +7,25 @@ import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from "@/components/ui/card";
 import { toast } from "sonner";
 import { Navbar } from "@/components/Navbar";
-import { Mail, MapPin, User, ArrowRight, ArrowLeft, CheckCircle, Smartphone } from "lucide-react";
+import { Mail, MapPin, User, ArrowRight, ArrowLeft, CheckCircle, Smartphone, Loader2, Info } from "lucide-react";
+import { BoxPackingAnimation } from "@/components/BoxPackingAnimation";
+import { useUser } from "@/context/UserContext";
 
-export default function Checkout() {
+const API_BASE_URL = import.meta.env.VITE_API_URL || '/api';
+
+export const Checkout = () => {
     const location = useLocation();
     const navigate = useNavigate();
+    const { customer, isLoggedIn, loading: authLoading, login: globalLogin } = useUser();
     const orderData = location.state?.orderData;
 
     const [showSuccess, setShowSuccess] = useState(false);
     const [confirmedOrder, setConfirmedOrder] = useState<any>(null);
 
-    useEffect(() => {
-        if (!orderData) {
-            toast.error("No order found. Redirecting to home.");
-            navigate("/");
-            return;
-        }
-
-        // Load Razorpay Script
-        const script = document.createElement("script");
-        script.src = "https://checkout.razorpay.com/v1/checkout.js";
-        script.async = true;
-        document.body.appendChild(script);
-
-        return () => {
-            document.body.removeChild(script);
-        };
-    }, [orderData, navigate]);
 
     const [step, setStep] = useState(1);
     const [loading, setLoading] = useState(false);
+    const [showMapInstructions, setShowMapInstructions] = useState(false);
 
     // Form States
     const [email, setEmail] = useState("");
@@ -49,9 +38,75 @@ export default function Checkout() {
         house: "",
         area: "",
         landmark: "",
+        mapLink: "",
         pincode: "",
         label: "Home"
     });
+
+    // Save success state to session storage to persist across refreshes
+    useEffect(() => {
+        if (showSuccess && confirmedOrder) {
+            sessionStorage.setItem('last_confirmed_order', JSON.stringify(confirmedOrder));
+            sessionStorage.setItem('last_order_address', JSON.stringify(address));
+            sessionStorage.setItem('last_order_phone', phone);
+            sessionStorage.setItem('show_success_persistence', 'true');
+        }
+    }, [showSuccess, confirmedOrder, address, phone]);
+
+    useEffect(() => {
+        // Attempt to restore success state from session storage
+        const persistedSuccess = sessionStorage.getItem('show_success_persistence');
+        if (persistedSuccess === 'true') {
+            const savedOrder = sessionStorage.getItem('last_confirmed_order');
+            const savedAddress = sessionStorage.getItem('last_order_address');
+            const savedPhone = sessionStorage.getItem('last_order_phone');
+
+            if (savedOrder) {
+                setConfirmedOrder(JSON.parse(savedOrder));
+                if (savedAddress) setAddress(JSON.parse(savedAddress));
+                if (savedPhone) setPhone(savedPhone);
+                setShowSuccess(true);
+                return; // Don't redirect if we have a persisted success state
+            }
+        }
+
+        if (!orderData) {
+            toast.error("No order found. Redirecting to home.");
+            navigate("/");
+            return;
+        }
+
+        // Auto-advance if logged in
+        if (isLoggedIn && customer && !authLoading) {
+            setStep(3);
+            setName(customer.name || "");
+            setPhone(customer.phone || "");
+            setEmail(customer.email || "");
+            if (customer.addresses?.length > 0) {
+                const lastAddr = customer.addresses[customer.addresses.length - 1];
+                setAddress({
+                    house: lastAddr.house || "",
+                    area: lastAddr.area || "",
+                    landmark: lastAddr.landmark || "",
+                    mapLink: lastAddr.mapLink || "",
+                    pincode: lastAddr.pincode || "",
+                    label: lastAddr.label || "Home"
+                });
+            }
+        }
+
+        // Load Razorpay Script
+        const script = document.createElement("script");
+        script.src = "https://checkout.razorpay.com/v1/checkout.js";
+        script.async = true;
+        document.body.appendChild(script);
+
+        return () => {
+            if (document.body.contains(script)) {
+                document.body.removeChild(script);
+            }
+        };
+    }, [orderData, navigate, isLoggedIn, customer, authLoading]);
     const [paymentMethod, setPaymentMethod] = useState<"COD" | "Razorpay">("COD");
 
     const [existingCustomer, setExistingCustomer] = useState(null);
@@ -65,7 +120,7 @@ export default function Checkout() {
 
         setLoading(true);
         try {
-            const response = await fetch('/api/check-customer-by-email', {
+            const response = await fetch(`${API_BASE_URL}/check-customer-by-email`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ email })
@@ -83,12 +138,15 @@ export default function Checkout() {
                         house: lastAddr.house || "",
                         area: lastAddr.area || "",
                         landmark: lastAddr.landmark || "",
+                        mapLink: lastAddr.mapLink || "",
                         pincode: lastAddr.pincode || "",
                         label: lastAddr.label || "Home"
                     });
                 }
-                toast.success("Welcome back!");
                 setStep(3);
+                // Sync with global context
+                await globalLogin(email);
+                toast.success("Welcome back!");
             } else {
                 toast.info("Welcome! Please provide your details to continue.");
                 setStep(2);
@@ -100,48 +158,7 @@ export default function Checkout() {
         }
     };
 
-    const handleGoogleLogin = async () => {
-        setLoading(true);
-        // Simulation of Google Auth
-        setTimeout(async () => {
-            const simulatedEmail = "user@gmail.com";
-            setEmail(simulatedEmail);
-            toast.success("Signed in with Google");
 
-            try {
-                const response = await fetch('/api/check-customer-by-email', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ email: simulatedEmail })
-                });
-                const data = await response.json();
-
-                if (data.exists) {
-                    setExistingCustomer(data.data);
-                    setName(data.data.name);
-                    setPhone(data.data.phone);
-                    setAge(data.data.age);
-                    if (data.data.addresses?.length > 0) {
-                        const lastAddr = data.data.addresses[data.data.addresses.length - 1];
-                        setAddress({
-                            house: lastAddr.house || "",
-                            area: lastAddr.area || "",
-                            landmark: lastAddr.landmark || "",
-                            pincode: lastAddr.pincode || "",
-                            label: lastAddr.label || "Home"
-                        });
-                    }
-                    setStep(3); // Skip to address verification
-                } else {
-                    setStep(2); // Go to personal details
-                }
-            } catch (err) {
-                setStep(2);
-            } finally {
-                setLoading(false);
-            }
-        }, 1000);
-    };
 
     const handleRazorpayPayment = async () => {
         if (!(window as any).Razorpay) {
@@ -150,7 +167,7 @@ export default function Checkout() {
         }
 
         const options = {
-            key: "rzp_test_SGLAMiDgEHudw7", // Updated with user's test key
+            key: import.meta.env.VITE_RAZORPAY_KEY, // Test mode key from environment variable
             amount: (orderData.totalPrice * 100).toString(),
             currency: "INR",
             name: "Cycle Harmony",
@@ -201,10 +218,14 @@ export default function Checkout() {
                 phone,
                 age,
                 address,
-                paymentMethod: finalMethod
+                paymentMethod: finalMethod,
+                planType: orderData.planType,
+                nextDeliveryDate: orderData.nextDeliveryDate,
+                shippingDate: orderData.shippingDate,
+                autoPhase2: orderData.autoPhase2
             };
 
-            const response = await fetch('/api/orders', {
+            const response = await fetch(`${API_BASE_URL}/orders`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(finalOrder)
@@ -243,11 +264,8 @@ export default function Checkout() {
     const renderSuccessScreen = () => {
         return (
             <div className="flex flex-col items-center justify-center py-12 px-4 animate-in fade-in zoom-in duration-500">
-                <div className="relative mb-8">
-                    <div className="absolute inset-0 bg-pink-200 rounded-full animate-ping opacity-20 scale-150"></div>
-                    <div className="relative w-24 h-24 bg-gradient-to-br from-pink-500 to-purple-600 rounded-full flex items-center justify-center shadow-2xl shadow-pink-200 animate-in slide-in-from-bottom-8 duration-700">
-                        <CheckCircle className="w-12 h-12 text-white stroke-[3px]" />
-                    </div>
+                <div className="mb-4 relative flex justify-center scale-75 sm:scale-100">
+                    <BoxPackingAnimation />
                 </div>
 
                 <h2 className="text-4xl font-black text-gray-900 mb-2 text-center">Order Confirmed!</h2>
@@ -286,14 +304,20 @@ export default function Checkout() {
 
                 <div className="flex flex-col w-full gap-4">
                     <Button
-                        onClick={() => navigate("/profile")}
+                        onClick={() => {
+                            sessionStorage.removeItem('show_success_persistence');
+                            navigate("/profile");
+                        }}
                         className="h-14 bg-gray-900 hover:bg-black text-white text-lg font-bold rounded-2xl shadow-xl transition-all hover:scale-[1.02]"
                     >
                         Track My Order
                     </Button>
                     <Button
                         variant="ghost"
-                        onClick={() => navigate("/")}
+                        onClick={() => {
+                            sessionStorage.removeItem('show_success_persistence');
+                            navigate("/");
+                        }}
                         className="h-14 text-pink-600 font-bold hover:bg-pink-50 rounded-2xl"
                     >
                         Continue Shopping
@@ -310,7 +334,12 @@ export default function Checkout() {
             <Navbar />
 
             <div className="container mx-auto px-4 py-8 pt-24 max-w-2xl">
-                {showSuccess ? renderSuccessScreen() : (
+                {authLoading ? (
+                    <div className="flex flex-col items-center justify-center py-20">
+                        <Loader2 className="w-10 h-10 text-pink-500 animate-spin mb-4" />
+                        <p className="text-gray-500 font-medium tracking-wide">Restoring your session...</p>
+                    </div>
+                ) : showSuccess ? renderSuccessScreen() : (
                     <>
                         {/* Step Indicator */}
                         <div className="flex justify-between mb-8 px-4 relative">
@@ -334,7 +363,7 @@ export default function Checkout() {
                                         <Mail className="w-8 h-8 text-pink-500" />
                                     </div>
                                     <CardTitle className="text-2xl font-bold">Sign In to Continue</CardTitle>
-                                    <CardDescription>Login with your Google account to track your orders</CardDescription>
+                                    <CardDescription>Enter your email and password to proceed</CardDescription>
                                 </CardHeader>
                                 <CardContent className="space-y-6 pt-4">
                                     <form onSubmit={handleStandardLogin} className="space-y-4">
@@ -369,21 +398,7 @@ export default function Checkout() {
                                         </Button>
                                     </form>
 
-                                    <div className="flex items-center gap-2 text-gray-400 text-sm">
-                                        <div className="flex-1 h-px bg-gray-200"></div>
-                                        <span>OR</span>
-                                        <div className="flex-1 h-px bg-gray-200"></div>
-                                    </div>
 
-                                    <Button
-                                        onClick={handleGoogleLogin}
-                                        className="w-full h-12 text-md bg-white border-2 border-gray-200 text-gray-700 hover:bg-gray-50 hover:border-pink-200 gap-3 shadow-sm"
-                                        disabled={loading}
-                                        type="button"
-                                    >
-                                        <img src="https://www.google.com/favicon.ico" className="w-5 h-5" alt="G" />
-                                        {loading ? "Connecting..." : "Continue with Google (Gmail)"}
-                                    </Button>
 
                                     <div className="space-y-2 text-center text-xs text-gray-500">
                                         Data security is our priority. Your cycle data is encrypted.
@@ -450,6 +465,27 @@ export default function Checkout() {
                                             <div className="grid gap-2">
                                                 <Label className="text-xs text-gray-500 uppercase">Area / Street</Label>
                                                 <Input value={address.area} onChange={e => setAddress({ ...address, area: e.target.value })} />
+                                            </div>
+                                            <div className="grid gap-2">
+                                                <div className="flex items-center gap-2">
+                                                    <Label className="text-xs text-gray-500 uppercase">Google Maps Link (Optional)</Label>
+                                                    <Info
+                                                        className="w-4 h-4 text-pink-500 cursor-pointer hover:text-pink-600 transition-colors"
+                                                        onClick={() => setShowMapInstructions(!showMapInstructions)}
+                                                    />
+                                                </div>
+                                                {showMapInstructions && (
+                                                    <div className="text-xs text-gray-700 bg-pink-50/80 p-3 rounded-lg border border-pink-100 mb-1 leading-relaxed">
+                                                        <p className="font-semibold mb-1 text-pink-700">How to get your Map Link:</p>
+                                                        <ol className="list-decimal list-inside space-y-1 ml-1 opacity-90">
+                                                            <li>Open Google Maps on your phone</li>
+                                                            <li>Search or drop a pin at your home</li>
+                                                            <li>Tap the <strong>Share</strong> button</li>
+                                                            <li>Select <strong>Copy Link</strong> and paste here</li>
+                                                        </ol>
+                                                    </div>
+                                                )}
+                                                <Input placeholder="https://maps.app.goo.gl/..." value={address.mapLink || ""} onChange={e => setAddress({ ...address, mapLink: e.target.value })} />
                                             </div>
                                             <div className="grid grid-cols-2 gap-4">
                                                 <div className="grid gap-2">

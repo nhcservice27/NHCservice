@@ -1,14 +1,18 @@
 import { useState, useEffect } from "react";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import {
     Search, Package, Calendar, Clock, CheckCircle, Truck, XCircle,
-    User, MapPin, Settings, LogOut, ChevronRight, ShoppingBag, CreditCard
+    User, MapPin, Settings, LogOut, ChevronRight, ShoppingBag, CreditCard, Send,
+    AlertCircle, ArrowLeft
 } from "lucide-react";
+import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
 import { Navbar } from "@/components/Navbar";
+import { formatDate } from "@/lib/utils";
 
 import {
     Dialog,
@@ -21,16 +25,20 @@ import {
 } from "@/components/ui/dialog";
 import { Trash2, Plus } from "lucide-react";
 
-const API_BASE_URL = '/api';
+import { useUser } from "@/context/UserContext";
+
+const API_BASE_URL = import.meta.env.VITE_API_URL || '/api';
 
 export default function CustomerProfile() {
+    const navigate = useNavigate();
+    const { customer, isLoggedIn, loading, login, logout, updateCustomerData } = useUser();
     const [phone, setPhone] = useState("");
-    const [isLoggedIn, setIsLoggedIn] = useState(false);
-    const [loading, setLoading] = useState(false);
-    const [customer, setCustomer] = useState<any>(null);
+    const [isProcessing, setIsProcessing] = useState(false);
     const [orders, setOrders] = useState<any[]>([]);
-    const [activeTab, setActiveTab] = useState("overview");
-    const [selectedOrder, setSelectedOrder] = useState<any>(null);
+    const [searchParams, setSearchParams] = useSearchParams();
+    const activeTab = searchParams.get("tab") || "overview";
+    const selectedOrderId = searchParams.get("order");
+
     const [isAddAddressOpen, setIsAddAddressOpen] = useState(false);
     const [newAddress, setNewAddress] = useState({
         house: "",
@@ -41,53 +49,41 @@ export default function CustomerProfile() {
     });
 
     useEffect(() => {
-        const savedIdentity = localStorage.getItem('cycle_harmony_user_identity');
-        if (savedIdentity && !isLoggedIn) {
-            handleLogin(savedIdentity);
+        if (isLoggedIn && customer) {
+            fetchOrders(customer._id);
         }
-    }, []);
+    }, [isLoggedIn, customer]);
 
-    const handleLogin = async (val?: string) => {
-        const value = val || phone;
-        if (!value) {
-            toast.error("Please enter a valid detail");
-            return;
-        }
-
-        const isEmail = value.includes("@");
-        setLoading(true);
+    const fetchOrders = async (customerId: string) => {
         try {
-            const url = isEmail
-                ? `${API_BASE_URL}/customer-profile-by-email/${encodeURIComponent(value)}`
-                : `${API_BASE_URL}/customer-profile/${value}`;
-
-            const response = await fetch(url);
+            const response = await fetch(`${API_BASE_URL}/customer-orders/${customerId}`);
             const data = await response.json();
-
             if (data.success) {
-                setCustomer(data.customer);
-                setOrders(data.orders);
-                setIsLoggedIn(true);
-                toast.success("Login Successful");
-            } else {
-                toast.error("Customer not found", {
-                    description: isEmail ? "No profile found with this email." : "No profile found with this number."
-                });
+                // Sort oldest first so A001A01 appears at top
+                const sorted = [...data.orders].sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
+                setOrders(sorted);
             }
         } catch (error) {
-            console.error("Login error:", error);
-            toast.error("Failed to login. Server might be down.");
-        } finally {
-            setLoading(false);
+            console.error("Fetch orders error:", error);
         }
     };
 
+    // Derived selectedOrder
+    const selectedOrder = orders.find(o => o._id === selectedOrderId) || null;
+
+
+    const handleLoginClick = async (val?: string) => {
+        const identity = val || phone;
+        if (!identity) {
+            toast.error("Please enter a valid detail");
+            return;
+        }
+        await login(identity);
+    };
+
     const handleGoogleLogin = () => {
-        setLoading(true);
-        setTimeout(() => {
-            const simulatedEmail = "user@gmail.com";
-            handleLogin(simulatedEmail);
-        }, 1000);
+        const simulatedEmail = "user@gmail.com";
+        login(simulatedEmail);
     };
 
     const handleNewAddress = async (e: React.FormEvent) => {
@@ -97,7 +93,7 @@ export default function CustomerProfile() {
             return;
         }
 
-        setLoading(true);
+        setIsProcessing(true);
         try {
             const response = await fetch(`${API_BASE_URL}/customers/${customer._id}/addresses`, {
                 method: 'POST',
@@ -107,7 +103,7 @@ export default function CustomerProfile() {
             const data = await response.json();
 
             if (data.success) {
-                setCustomer({ ...customer, addresses: data.data });
+                updateCustomerData({ addresses: data.data });
                 setIsAddAddressOpen(false);
                 setNewAddress({ house: "", area: "", landmark: "", pincode: "", label: "Home" });
                 toast.success("Address added successfully");
@@ -117,14 +113,14 @@ export default function CustomerProfile() {
         } catch (error) {
             toast.error("Network error");
         } finally {
-            setLoading(false);
+            setIsProcessing(false);
         }
     };
 
     const handleDeleteAddress = async (index: number) => {
         if (!confirm("Are you sure you want to delete this address?")) return;
 
-        setLoading(true);
+        setIsProcessing(true);
         try {
             const response = await fetch(`${API_BASE_URL}/customers/${customer._id}/addresses/${index}`, {
                 method: 'DELETE'
@@ -132,7 +128,7 @@ export default function CustomerProfile() {
             const data = await response.json();
 
             if (data.success) {
-                setCustomer({ ...customer, addresses: data.data });
+                updateCustomerData({ addresses: data.data });
                 toast.success("Address deleted successfully");
             } else {
                 toast.error(data.message || "Failed to delete address");
@@ -140,7 +136,34 @@ export default function CustomerProfile() {
         } catch (error) {
             toast.error("Network error");
         } finally {
-            setLoading(false);
+            setIsProcessing(false);
+        }
+    };
+
+    const handleUpgradePlan = async () => {
+        if (!confirm("Are you sure you want to upgrade to the Complete Balance Plan subscription?")) return;
+        setIsProcessing(true);
+        try {
+            const response = await fetch(`${API_BASE_URL}/customers/${customer._id}`, {
+                method: 'PATCH',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    planType: 'complete',
+                    subscriptionStatus: 'active',
+                    autoPhase2: true
+                })
+            });
+            const data = await response.json();
+            if (data.success) {
+                updateCustomerData({ planType: 'complete', subscriptionStatus: 'active', autoPhase2: true });
+                toast.success("Successfully upgraded to Complete Balance Plan!");
+            } else {
+                toast.error(data.message || "Failed to upgrade plan");
+            }
+        } catch (error) {
+            toast.error("Network error upgrading plan");
+        } finally {
+            setIsProcessing(false);
         }
     };
 
@@ -191,6 +214,8 @@ export default function CustomerProfile() {
             Shipped: { color: "bg-indigo-100 text-indigo-700", icon: Truck },
             Delivered: { color: "bg-green-100 text-green-700", icon: CheckCircle },
             Cancelled: { color: "bg-red-100 text-red-700", icon: XCircle },
+            Requested: { color: "bg-pink-100 text-pink-700 animate-pulse", icon: Send },
+            "Not Approved": { color: "bg-gray-100 text-gray-500 border border-dashed border-gray-300", icon: Calendar }
         };
 
         const variant = variants[status] || variants.Pending;
@@ -256,7 +281,7 @@ export default function CustomerProfile() {
                                     </div>
                                     <Button
                                         className="w-full h-12 text-lg bg-gradient-to-r from-pink-500 to-purple-500 hover:from-pink-600 hover:to-purple-600 shadow-lg shadow-pink-200"
-                                        onClick={() => handleLogin()}
+                                        onClick={() => handleLoginClick()}
                                         disabled={loading}
                                     >
                                         {loading ? "Fetching Profile..." : "View My Orders"}
@@ -282,24 +307,30 @@ export default function CustomerProfile() {
                                 <div className="space-y-1">
                                     {sidebarItems.map((item) => {
                                         const Icon = item.icon;
+                                        const hasRequested = item.id === "orders" && orders.some(o => o.orderStatus === 'Requested');
                                         return (
                                             <button
                                                 key={item.id}
-                                                onClick={() => { setActiveTab(item.id); setSelectedOrder(null); }}
-                                                className={`w-full flex items-center gap-3 px-4 py-3 rounded-2xl text-sm font-semibold transition-all ${activeTab === item.id
+                                                onClick={() => { setSearchParams({ tab: item.id }); }}
+
+                                                className={`w-full flex items-center justify-between px-4 py-3 rounded-2xl text-sm font-semibold transition-all ${activeTab === item.id
                                                     ? "bg-pink-500 text-white shadow-lg shadow-pink-100"
                                                     : "text-gray-500 hover:bg-pink-50 hover:text-pink-600"
                                                     }`}
                                             >
-                                                <Icon className="w-4 h-4" />
-                                                {item.label}
+                                                <div className="flex items-center gap-3">
+                                                    <Icon className="w-4 h-4" />
+                                                    {item.label}
+                                                </div>
+                                                {hasRequested && (
+                                                    <div className="w-2 h-2 bg-yellow-400 rounded-full animate-pulse shadow-sm"></div>
+                                                )}
                                             </button>
                                         );
                                     })}
                                     <button
                                         onClick={() => {
-                                            localStorage.removeItem('cycle_harmony_user_identity');
-                                            setIsLoggedIn(false);
+                                            logout();
                                         }}
                                         className="w-full flex items-center gap-3 px-4 py-3 rounded-2xl text-sm font-semibold text-red-400 hover:bg-red-50 transition-all mt-4"
                                     >
@@ -336,49 +367,158 @@ export default function CustomerProfile() {
                                                     </div>
                                                 </div>
                                                 <p className="text-xl font-black text-gray-900">
-                                                    {customer?.createdAt ? new Date(customer.createdAt).toLocaleDateString(undefined, { month: 'long', year: 'numeric' }) : 'N/A'}
+                                                    {formatDate(customer?.createdAt)}
                                                 </p>
                                                 <p className="text-sm text-gray-500 font-medium">Wellness Journey Started</p>
                                             </CardContent>
                                         </Card>
                                     </div>
 
-                                    {orders.length > 0 && (
-                                        <Card className="border-none shadow-xl bg-gradient-to-br from-pink-500 to-purple-600 text-white relative overflow-hidden">
-                                            <div className="absolute top-0 right-0 w-64 h-64 bg-white/10 rounded-full -mr-20 -mt-20 blur-3xl"></div>
-                                            <CardHeader>
-                                                <CardTitle className="text-xl font-bold flex items-center gap-2">
-                                                    <Truck className="w-5 h-5" /> Last Order Status
-                                                </CardTitle>
-                                            </CardHeader>
-                                            <CardContent>
-                                                <div className="flex justify-between items-end">
-                                                    <div>
-                                                        <p className="text-4xl font-black mb-1">{orders[0].orderStatus}</p>
-                                                        <p className="text-white/80 text-sm">#{orders[0].orderId || orders[0]._id.slice(-6).toUpperCase()} • {orders[0].phase}</p>
+                                    {/* Action Required: Requested Orders */}
+                                    {orders.some(o => o.orderStatus === 'Requested') && (
+                                        <Card className="border-none shadow-xl bg-yellow-50 overflow-hidden animate-in fade-in slide-in-from-top-4 duration-500">
+                                            <div className="bg-yellow-400 h-1.5 w-full"></div>
+                                            <CardContent className="p-6">
+                                                <div className="flex items-center gap-4">
+                                                    <div className="w-12 h-12 bg-white rounded-2xl flex items-center justify-center shadow-sm">
+                                                        <AlertCircle className="w-6 h-6 text-yellow-600" />
+                                                    </div>
+                                                    <div className="flex-1">
+                                                        <h3 className="text-lg font-black text-gray-900 leading-tight">Action Required!</h3>
+                                                        <p className="text-sm text-gray-600">You have order requests awaiting your confirmation.</p>
                                                     </div>
                                                     <Button
-                                                        onClick={() => { setSelectedOrder(orders[0]); setActiveTab("orders"); }}
-                                                        variant="secondary"
-                                                        className="bg-white text-pink-600 hover:bg-gray-100"
+                                                        onClick={() => setSearchParams({ tab: "orders" })}
+                                                        className="bg-yellow-500 hover:bg-yellow-600 text-white font-bold rounded-xl"
                                                     >
-                                                        Track Order
+                                                        Review Now
                                                     </Button>
                                                 </div>
-                                                {orders[0].deliveryDate && (
-                                                    <div className="mt-4 pt-4 border-t border-white/20 flex items-center gap-3">
-                                                        <div className="bg-white/20 p-2 rounded-lg">
-                                                            <Calendar className="w-5 h-5" />
-                                                        </div>
-                                                        <div>
-                                                            <p className="text-[10px] text-white/70 uppercase font-bold tracking-widest">Expected Delivery</p>
-                                                            <p className="font-bold text-lg">{new Date(orders[0].deliveryDate).toLocaleDateString(undefined, { day: 'numeric', month: 'long', year: 'numeric' })}</p>
-                                                        </div>
-                                                    </div>
-                                                )}
                                             </CardContent>
                                         </Card>
                                     )}
+
+                                    {/* Last Order Status Card (NOW FIRST) */}
+                                    {orders.length > 0 && (() => {
+                                        const displayOrder = orders.find(o => o.orderStatus === 'Requested') || orders.find(o => ['Confirmed', 'Processing', 'Shipped'].includes(o.orderStatus)) || orders[0];
+                                        return (
+                                            <Card className="border-none shadow-xl bg-gradient-to-br from-pink-500 to-purple-600 text-white relative overflow-hidden animate-in fade-in slide-in-from-top-4 duration-500">
+                                                <div className="absolute top-0 right-0 w-64 h-64 bg-white/10 rounded-full -mr-20 -mt-20 blur-3xl"></div>
+                                                <CardHeader className="pb-2">
+                                                    <CardTitle className="text-sm font-bold flex items-center gap-2 opacity-90 uppercase tracking-wider">
+                                                        <Truck className="w-4 h-4" /> Last Order Status
+                                                    </CardTitle>
+                                                </CardHeader>
+                                                <CardContent>
+                                                    <div className="flex justify-between items-center mb-4">
+                                                        <div>
+                                                            <p className="text-4xl font-black mb-1">{displayOrder.orderStatus}</p>
+                                                            <p className="text-white/80 text-xs font-bold font-mono">#{displayOrder.orderId || displayOrder._id.slice(-6).toUpperCase()} • {displayOrder.phase}</p>
+                                                        </div>
+                                                        <Button
+                                                            onClick={() => { setSearchParams({ tab: "orders", order: displayOrder._id }); }}
+                                                            variant="secondary"
+                                                            className="bg-white text-pink-600 hover:bg-gray-100 font-bold shadow-lg"
+                                                        >
+                                                            Track Order
+                                                        </Button>
+                                                    </div>
+
+                                                    <div className="mt-6 pt-6 border-t border-white/20 grid grid-cols-2 gap-8">
+                                                        {displayOrder.deliveryDate && (
+                                                            <div className="flex items-center gap-3">
+                                                                <div className="bg-white/20 p-2.5 rounded-xl">
+                                                                    <Calendar className="w-4 h-4" />
+                                                                </div>
+                                                                <div>
+                                                                    <p className="text-[10px] text-white/70 uppercase font-black tracking-widest mb-0.5">Expected Delivery</p>
+                                                                    <p className="font-bold text-sm md:text-base">{formatDate(displayOrder.deliveryDate)}</p>
+                                                                </div>
+                                                            </div>
+                                                        )}
+                                                        <div className="flex items-center gap-3">
+                                                            <div className="bg-white/20 p-2.5 rounded-xl">
+                                                                <Package className="w-4 h-4" />
+                                                            </div>
+                                                            <div>
+                                                                <p className="text-[10px] text-white/70 uppercase font-black tracking-widest mb-0.5">Order Day</p>
+                                                                <p className="font-bold text-sm md:text-base">
+                                                                    {formatDate(displayOrder.createdAt)}
+                                                                </p>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                </CardContent>
+                                            </Card>
+                                        );
+                                    })()}
+
+                                    {/* My Subscription Card (NOW SECOND) */}
+                                    <Card className="border-none shadow-xl bg-white overflow-hidden relative animate-in fade-in slide-in-from-bottom-4 duration-500 delay-150">
+                                        <div className={`absolute top-0 left-0 w-2 h-full ${customer?.subscriptionStatus === 'active' ? 'bg-green-500' : 'bg-gray-200'}`}></div>
+                                        <CardHeader className="pb-2">
+                                            <div className="flex justify-between items-start">
+                                                <div>
+                                                    <CardTitle className="text-lg font-bold flex items-center gap-2">
+                                                        <span className="text-xl">☀️</span> My Subscription
+                                                    </CardTitle>
+                                                    <CardDescription>Track your active cycle plan</CardDescription>
+                                                </div>
+                                                <Badge className={`${customer?.subscriptionStatus === 'active' ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-700'} border-none font-bold uppercase tracking-wider text-[10px]`}>
+                                                    {customer?.subscriptionStatus || 'No Active Plan'}
+                                                </Badge>
+                                            </div>
+                                        </CardHeader>
+                                        <CardContent className="space-y-6">
+                                            <div className="flex items-center gap-4 bg-pink-50/50 p-4 rounded-2xl border border-pink-100">
+                                                <div className="w-12 h-12 bg-white rounded-xl shadow-sm flex items-center justify-center text-2xl">
+                                                    {customer?.planType === 'complete' ? '🌼' : '🌸'}
+                                                </div>
+                                                <div>
+                                                    <p className="font-black text-gray-900 leading-tight">
+                                                        {customer?.planType === 'complete' ? 'Complete Balance Plan' : (customer?.planType === 'starter' ? 'Cycle Starter Plan' : 'No Plan Selected')}
+                                                    </p>
+                                                    <p className="text-xs text-gray-500 font-medium">
+                                                        {customer?.planType === 'complete' ? 'Auto-delivery for both phases' : 'One-time phase delivery'}
+                                                    </p>
+                                                </div>
+                                            </div>
+
+                                            {customer?.planType && (
+                                                <div className="space-y-4">
+                                                    {customer.planType === 'starter' && (
+                                                        <div className="mt-4 p-4 bg-gradient-to-r from-purple-50 to-pink-50 rounded-2xl border border-purple-100 flex flex-col md:flex-row items-center justify-between gap-4">
+                                                            <div>
+                                                                <h4 className="font-bold text-gray-900 flex items-center gap-2">Upgrade to Complete Balance ✨</h4>
+                                                                <p className="text-xs text-gray-500 mt-1">Subscribe now to get both Phase 1 & 2 laddus delivered automatically every cycle.</p>
+                                                            </div>
+                                                            <Button onClick={handleUpgradePlan} disabled={isProcessing} className="bg-purple-600 hover:bg-purple-700 text-white font-bold whitespace-nowrap shadow-md shadow-purple-200 shrink-0">
+                                                                {isProcessing ? "Upgrading..." : "Upgrade Plan"}
+                                                            </Button>
+                                                        </div>
+                                                    )}
+                                                    {customer.planType === 'complete' && customer.nextDeliveryDate && (
+                                                        <div className="grid grid-cols-2 gap-4">
+                                                            <div className="space-y-1">
+                                                                <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Next Delivery</p>
+                                                                <div className="flex items-center gap-2 text-gray-900">
+                                                                    <Calendar className="w-4 h-4" />
+                                                                    <span className="font-bold">{formatDate(customer.nextDeliveryDate)}</span>
+                                                                </div>
+                                                            </div>
+                                                            <div className="space-y-1">
+                                                                <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Deliver in</p>
+                                                                <div className="flex items-center gap-2 text-pink-600 font-black">
+                                                                    <Clock className="w-4 h-4" />
+                                                                    <span>{Math.ceil((new Date(customer.nextDeliveryDate).getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24))} Days</span>
+                                                                </div>
+                                                            </div>
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            )}
+                                        </CardContent>
+                                    </Card>
                                 </div>
                             )}
 
@@ -391,11 +531,12 @@ export default function CustomerProfile() {
                                         </h2>
                                         {selectedOrder && (
                                             <Button
-                                                variant="ghost"
+                                                variant="outline"
                                                 size="sm"
-                                                onClick={() => setSelectedOrder(null)}
-                                                className="text-gray-500 hover:text-pink-600"
+                                                onClick={() => setSearchParams({ tab: "orders" })}
+                                                className="text-pink-600 border-pink-200 hover:bg-pink-50 flex items-center gap-2 font-bold"
                                             >
+                                                <ArrowLeft className="w-4 h-4" />
                                                 Back to List
                                             </Button>
                                         )}
@@ -429,7 +570,7 @@ export default function CustomerProfile() {
                                                                 </div>
                                                                 <div>
                                                                     <p className="font-bold text-gray-900 text-lg">
-                                                                        {selectedOrder.deliveryDate ? new Date(selectedOrder.deliveryDate).toLocaleDateString(undefined, { day: 'numeric', month: 'long', year: 'numeric' }) : "Calculation pending..."}
+                                                                        {selectedOrder.deliveryDate ? formatDate(selectedOrder.deliveryDate) : "Calculation pending..."}
                                                                     </p>
                                                                     <p className="text-xs text-gray-500">Subject to logistics partners</p>
                                                                 </div>
@@ -469,19 +610,27 @@ export default function CustomerProfile() {
                                                                         <Package className="w-6 h-6 text-gray-400" />
                                                                     </div>
                                                                     <div>
-                                                                        <p className="font-bold text-gray-900">Order #{order.orderId || order._id.slice(-6).toUpperCase()}</p>
-                                                                        <p className="text-xs text-gray-400 flex items-center gap-1">
-                                                                            <Calendar className="w-3 h-3" />
-                                                                            {new Date(order.createdAt).toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' })}
-                                                                        </p>
+                                                                        <p className="font-bold text-gray-800">Order #{order.orderId || (order._id ? order._id.toString().slice(-6).toUpperCase() : 'N/A')}</p>
+                                                            <p className="text-xs text-gray-500">
+                                                                {formatDate(order.createdAt)}
+                                                            </p>
                                                                     </div>
                                                                 </div>
                                                                 <div className="flex items-center gap-4">
                                                                     <div className="text-right">
-                                                                        <p className="text-xl font-black text-gray-900">₹{order.totalPrice}</p>
-                                                                        <p className="text-[10px] text-gray-400 font-bold uppercase tracking-widest">{order.totalQuantity} Items</p>
+                                                                        <p className="text-xl font-black text-gray-900">Total Price:₹{order.totalPrice}</p>
+                                                                        <p className="text-[10px] text-gray-400 font-bold uppercase tracking-widest">Total Quantity:{order.totalQuantity} Laddus</p>
                                                                     </div>
-                                                                    <Button size="sm" variant="outline" className="border-pink-200 text-pink-600 hover:bg-pink-50" onClick={() => setSelectedOrder(order)}>Details</Button>
+                                                                    <Button size="sm" variant="outline" className="border-pink-200 text-pink-600 hover:bg-pink-50" onClick={() => setSearchParams({ tab: "orders", order: order._id })}>Details</Button>
+                                                                    {order.orderStatus === 'Requested' && (
+                                                                        <Button
+                                                                            size="sm"
+                                                                            className="bg-pink-500 hover:bg-pink-600 text-white font-bold"
+                                                                            onClick={(e) => { e.stopPropagation(); navigate(`/confirm-order/${order._id}`); }}
+                                                                        >
+                                                                            Confirm Now
+                                                                        </Button>
+                                                                    )}
                                                                     {getStatusBadge(order.orderStatus)}
                                                                 </div>
                                                             </div>
@@ -490,12 +639,12 @@ export default function CustomerProfile() {
                                                                 <div>
                                                                     <h4 className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-2">Order Details</h4>
                                                                     <div className="space-y-1 text-sm">
-                                                                        <p className="text-gray-700 font-medium">{order.phase} Healthy Laddus</p>
-                                                                        <p className="text-gray-500 text-xs">{order.totalWeight}g • {order.cycleLength} Day Cycle</p>
+                                                                        <p className="text-gray-700 font-bold">{order.totalQuantity} {order.phase} Healthy Laddus</p>
+                                                                        <p className="text-gray-500 text-xs font-medium">{order.totalWeight || (order.totalQuantity * 30)}g • {order.cycleLength} Day Cycle</p>
                                                                         {order.deliveryDate && (
                                                                             <div className="flex items-center gap-1.5 text-green-600 font-bold mt-1">
                                                                                 <Truck className="w-3 h-3" />
-                                                                                <span className="text-[10px]">Expected: {new Date(order.deliveryDate).toLocaleDateString()}</span>
+                                                                                <span className="text-[10px]">Expected: {formatDate(order.deliveryDate)}</span>
                                                                             </div>
                                                                         )}
                                                                         {order.paymentMethod && (
@@ -628,8 +777,8 @@ export default function CustomerProfile() {
                                                         </div>
                                                     </div>
                                                     <DialogFooter>
-                                                        <Button type="submit" className="bg-pink-500 hover:bg-pink-600 text-white w-full h-12" disabled={loading}>
-                                                            {loading ? "Saving..." : "Save Address"}
+                                                        <Button type="submit" className="bg-pink-500 hover:bg-pink-600 text-white w-full h-12" disabled={isProcessing}>
+                                                            {isProcessing ? "Saving..." : "Save Address"}
                                                         </Button>
                                                     </DialogFooter>
                                                 </form>
@@ -672,8 +821,4 @@ export default function CustomerProfile() {
             </div>
         </div>
     );
-}
-
-function Label({ children, className }: { children: React.ReactNode, className?: string }) {
-    return <p className={`text-xs font-bold uppercase tracking-widest ${className}`}>{children}</p>;
 }

@@ -1,9 +1,10 @@
-
+import { useState } from "react";
 import logo from "@/assets/logo-nhc.jpg";
 import { User, Search, Menu, X } from "lucide-react";
-import { useState } from "react";
+import { useUser } from "@/context/UserContext";
 
 export function Navbar() {
+    const { customer, isLoggedIn } = useUser();
     const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
     const navLinks = [
@@ -52,10 +53,15 @@ export function Navbar() {
                     {/* User Profile Icon */}
                     <a
                         href="/profile"
-                        className="flex items-center text-sm font-medium text-gray-600 hover:text-pink-600 transition-colors"
+                        className="flex items-center gap-2 group"
                         aria-label="Customer Profile"
                     >
-                        <div className="p-2 rounded-full bg-white/80 backdrop-blur-sm shadow-sm hover:shadow-md transition-all border border-pink-100">
+                        {isLoggedIn && customer && (
+                            <span className="hidden md:block text-sm font-bold text-pink-600 animate-in fade-in slide-in-from-right-2">
+                                Hi, {customer.name.split(' ')[0]}
+                            </span>
+                        )}
+                        <div className="p-2 rounded-full bg-white/80 backdrop-blur-sm shadow-sm hover:shadow-md transition-all border border-pink-100 group-hover:border-pink-300">
                             <User className="h-5 w-5 text-pink-500" />
                         </div>
                     </a>

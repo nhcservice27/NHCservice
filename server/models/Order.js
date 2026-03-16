@@ -60,12 +60,10 @@ const orderSchema = new mongoose.Schema({
   address: {
     house: {
       type: String,
-      required: true,
       trim: true
     },
     area: {
       type: String,
-      required: true,
       trim: true
     },
     landmark: {
@@ -74,7 +72,6 @@ const orderSchema = new mongoose.Schema({
     },
     pincode: {
       type: String,
-      required: true,
       trim: true
     },
     mapLink: {
@@ -92,15 +89,35 @@ const orderSchema = new mongoose.Schema({
   paymentMethod: {
     type: String,
     required: true,
-    enum: ['Cash on Delivery', 'Online (Razorpay)', 'UPI', 'Card', 'Net Banking', 'Cash'],
+    enum: ['Cash on Delivery', 'Online (Razorpay)', 'UPI', 'Card', 'Net Banking', 'Cash', 'Pending'],
     default: 'Cash on Delivery'
   },
 
   // Order Status
   orderStatus: {
     type: String,
-    enum: ['Pending', 'Confirmed', 'Processing', 'Shipped', 'Delivered', 'Cancelled'],
+    enum: ['Pending', 'Confirmed', 'Processing', 'Shipped', 'Delivered', 'Cancelled', 'Requested', 'Not Approved'],
     default: 'Pending'
+  },
+  planType: {
+    type: String,
+    enum: ['starter', 'complete'],
+    default: 'starter'
+  },
+  subscriptionStatus: {
+    type: String,
+    enum: ['active', 'completed', 'paused'],
+    default: 'completed'
+  },
+  autoPhase2: {
+    type: Boolean,
+    default: false
+  },
+  nextDeliveryDate: {
+    type: Date
+  },
+  shippingDate: {
+    type: Date
   },
 
   // Delivery Assignment
@@ -118,6 +135,9 @@ const orderSchema = new mongoose.Schema({
 
   // Additional Information
   message: {
+    type: String
+  },
+  stockWarning: {
     type: String
   },
 

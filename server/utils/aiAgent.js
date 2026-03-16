@@ -2,6 +2,20 @@ import { GoogleGenerativeAI } from '@google/generative-ai';
 import Customer from '../models/Customer.js';
 import Order from '../models/Order.js';
 import Product from '../models/Product.js';
+import Ingredient from '../models/Ingredient.js';
+
+const MASTER_INGREDIENTS = [
+    { name: "Pumpkin Seeds", phase: "Phase-1" },
+    { name: "Flax Seeds", phase: "Phase-1" },
+    { name: "Sunflower Seeds", phase: "Phase-1" },
+    { name: "Sesame seeds", phase: "Phase-1" },
+    { name: "Black Sesame Seeds", phase: "Phase-1" },
+    { name: "Dry Dates Powder", phase: "Phase-2" },
+    { name: "Jaggery Powder", phase: "Phase-2" },
+    { name: "Pure Ghee", phase: "Phase-2" },
+    { name: "Almond", phase: "Phase-2" },
+    { name: "Dry Coconut Powder", phase: "Phase-2" }
+];
 
 // Lazy initialization - model is created on first use, after dotenv has loaded
 let model = null;
@@ -15,10 +29,19 @@ function getModel() {
         console.log('🔑 Initializing Gemini with API key:', apiKey.substring(0, 10) + '...');
         const genAI = new GoogleGenerativeAI(apiKey);
         model = genAI.getGenerativeModel({
-            model: 'gemini-2.0-flash',
+            model: 'gemini-flash-latest', // Correct ID from model list
             systemInstruction: `You are the Cycle Harmony AI Admin Assistant. You have FULL admin access to manage the business via Telegram.
 
 You can READ data and also PERFORM ACTIONS like changing order status, assigning delivery boys, and sending emails.
+You can also report on RAW MATERIAL (INGREDIENT) stock levels in grams, categorized by Phase-1 and Phase-2.
+
+CRITICAL - STOCK REPORTING RULES:
+1. When asked about stock or inventory, PRIORITIZE showing the "ingredient_stock" data (raw materials) over simple product units.
+2. Format stock reports by Phase:
+   - *Phase-1 (Follicular)*: List ingredients, their weight (in grams), and status.
+   - *Phase-2 (Luteal)*: List ingredients, their weight (in grams), and status.
+3. Use emojis for status: ✅ for good stock, ⚠️ for Low Stock (below threshold).
+4. If an ingredient is low stock, explicitly mention "LOW STOCK".
 
 CRITICAL - ADMINISTRATIVE AUTHORITY:
 - When the admin (the user) asks you to perform an action, DO IT IMMEDIATELY.
@@ -53,6 +76,17 @@ RULES FOR ACTION BLOCK:
 
 EXAMPLES:
 
+User: "Tell me the present stock"
+*Current Stock Information:*
+
+📦 *Phase-1 (Follicular)*
+• Pumpkin Seeds: *650g* ✅
+• Flax Seeds: *1200g* ✅
+
+📦 *Phase-2 (Luteal)*
+• Dry Dates Powder: *300g* ⚠️ (LOW STOCK)
+• Pure Ghee: *2000g* ✅
+
 User: "change anu status to shipped"
 ---ACTION---
 type: update_status
@@ -68,27 +102,6 @@ newValue: Shipped
 👤 Customer: anu
 🔄 Status: Processing ➜ *Shipped*
 
-User: "Assasin the delivery boy ram to #A005A01 and also send the mail"
----ACTION---
-type: assign_delivery
-customer: anu
-orderId: A005A01
-field: deliveryBoy
-oldValue: Not Assigned
-newValue: Ram
----END_ACTION---
----ACTION---
-type: send_email
-customer: anu
-orderId: A005A01
----END_ACTION---
-
-✅ *Delivery Boy Assigned!*
-📦 *Order #A005A01*
-👤 Customer: anu
-🚚 Delivery Boy: *Ram*
-📧 *Email Queued!*
-
 VALID STATUS VALUES: Pending, Confirmed, Processing, Shipped, Delivered, Cancelled
 ACTION TYPES: update_status, assign_delivery, send_email, update_stock, cancel_order, set_delivery_date
 
@@ -102,7 +115,13 @@ FORMATTING RULES:
 - ALWAYS show orderId (like #A004A01), NEVER show MongoDB _id
 - Structure order lists with emojis and separators
 - Always show totals/summaries at the end
-- Use ━━━ separators between items`
+- Use ━━━ separators between items
+
+CRITICAL - FUTURE ORDERS (NOT APPROVED):
+- Orders with status "Not Approved" are FUTURE orders (upcoming months).
+- DO NOT show "Not Approved" orders in general reports or "recent orders" lists unless specifically asked for "future", "upcoming", or "unapproved" orders.
+- If asked for "future orders", use the 'get_future_orders' tool and label them clearly as ⏳ FUTURE REQUESTS.`
+
         });
     }
     return model;
@@ -132,13 +151,15 @@ const tools = {
     get_order_history: async (phone_or_email) => {
         try {
             return await Order.find({
-                $or: [{ phone: phone_or_email }, { email: phone_or_email }]
+                $or: [{ phone: phone_or_email }, { email: phone_or_email }],
+                orderStatus: { $ne: 'Not Approved' }
             }).sort({ createdAt: -1 }).limit(10);
         } catch (err) {
             console.error('Order history error:', err.message);
             return { error: 'Failed to get order history' };
         }
     },
+
 
     get_inventory_status: async () => {
         try {
@@ -155,25 +176,39 @@ const tools = {
         }
     },
 
+    get_recent_customers: async () => {
+        try {
+            return await Customer.find({}).sort({ createdAt: -1 }).limit(5);
+        } catch (err) {
+            console.error('Recent customers error:', err.message);
+            return { error: 'Failed to get recent customers' };
+        }
+    },
+
     get_recent_orders: async () => {
         try {
-            return await Order.find({}).sort({ createdAt: -1 }).limit(5);
+            return await Order.find({ orderStatus: { $ne: 'Not Approved' } }).sort({ createdAt: -1 }).limit(5);
         } catch (err) {
             console.error('Recent orders error:', err.message);
             return { error: 'Failed to get recent orders' };
         }
     },
 
+
     get_todays_orders: async () => {
         try {
             const today = new Date();
             today.setHours(0, 0, 0, 0);
-            return await Order.find({ createdAt: { $gte: today } }).sort({ createdAt: -1 });
+            return await Order.find({
+                createdAt: { $gte: today },
+                orderStatus: { $ne: 'Not Approved' }
+            }).sort({ createdAt: -1 });
         } catch (err) {
             console.error('Todays orders error:', err.message);
             return { error: 'Failed to get todays orders' };
         }
     },
+
 
     get_todays_customers: async () => {
         try {
@@ -192,21 +227,26 @@ const tools = {
             today.setHours(0, 0, 0, 0);
             const yesterday = new Date(today);
             yesterday.setDate(yesterday.getDate() - 1);
-            return await Order.find({ createdAt: { $gte: yesterday, $lt: today } }).sort({ createdAt: -1 });
+            return await Order.find({
+                createdAt: { $gte: yesterday, $lt: today },
+                orderStatus: { $ne: 'Not Approved' }
+            }).sort({ createdAt: -1 });
         } catch (err) {
             console.error('Yesterday orders error:', err.message);
             return { error: 'Failed to get yesterday orders' };
         }
     },
 
+
     get_stats: async () => {
         try {
             const totalCustomers = await Customer.countDocuments();
             const totalOrders = await Order.countDocuments();
             const revenue = await Order.aggregate([
-                { $match: { orderStatus: { $ne: 'Cancelled' } } },
+                { $match: { orderStatus: { $nin: ['Cancelled', 'Not Approved'] } } },
                 { $group: { _id: null, total: { $sum: '$totalPrice' } } }
             ]);
+
             return {
                 totalCustomers,
                 totalOrders,
@@ -221,12 +261,29 @@ const tools = {
     find_order_by_customer: async (customerName) => {
         try {
             const searchRegex = new RegExp(customerName, 'i');
-            return await Order.find({ fullName: searchRegex }).sort({ createdAt: -1 }).limit(5);
+            return await Order.find({
+                fullName: searchRegex,
+                orderStatus: { $ne: 'Not Approved' }
+            }).sort({ createdAt: -1 }).limit(5);
         } catch (err) {
             console.error('Find order error:', err.message);
             return { error: 'Failed to find orders' };
         }
     },
+
+    get_future_orders: async (customerName) => {
+        try {
+            const query = { orderStatus: 'Not Approved' };
+            if (customerName) {
+                query.fullName = new RegExp(customerName, 'i');
+            }
+            return await Order.find(query).sort({ deliveryDate: 1 }).limit(10);
+        } catch (err) {
+            console.error('Future orders error:', err.message);
+            return { error: 'Failed to get future orders' };
+        }
+    },
+
 
     get_delivery_boys: async () => {
         try {
@@ -257,6 +314,21 @@ const tools = {
         } catch (err) {
             console.error('Delivery boys error:', err.message);
             return { error: 'Failed to get delivery boys' };
+        }
+    },
+
+    get_ingredient_stock: async () => {
+        try {
+            const ingredients = await Ingredient.find({}).sort({ phase: 1, name: 1 });
+            return ingredients.map(i => ({
+                name: i.name,
+                phase: i.phase,
+                stockGrams: i.stockGrams,
+                lowStock: i.stockGrams < (i.minThreshold || 500)
+            }));
+        } catch (err) {
+            console.error('Ingredient stock error:', err.message);
+            return { error: 'Failed to get ingredient stock' };
         }
     }
 };
@@ -523,7 +595,27 @@ If the user refers to previous conversation, use the history above.
 If the user wants an action, include the ACTION BLOCK with the orderId field (like A005A01).
 Be concise and helpful.`;
 
-        const result = await chat.sendMessage(prompt);
+        // Wrap sendMessage with retry logic
+        const sendMessageWithRetry = async (chat, prompt, retries = 3, delay = 5000) => {
+            for (let i = 0; i < retries; i++) {
+                try {
+                    return await chat.sendMessage(prompt);
+                } catch (error) {
+                    const errorText = error.toString().toLowerCase();
+                    const isQuotaError = errorText.includes('quota') || errorText.includes('429') || error.status === 429;
+                    if (isQuotaError && i < retries - 1) {
+                        const backoff = delay * Math.pow(2.5, i);
+                        console.log(`⏳ Rate limit hit. Retrying in ${backoff}ms... (Attempt ${i + 1}/${retries})`);
+                        console.log(`ℹ️ Error details: ${error.message?.substring(0, 100)}`);
+                        await new Promise(resolve => setTimeout(resolve, backoff));
+                        continue;
+                    }
+                    throw error;
+                }
+            }
+        };
+
+        const result = await sendMessageWithRetry(chat, prompt);
         let responseText = result.response.text();
         console.log('✅ AI Response generated');
         console.log('📝 Response preview:', responseText.substring(0, 300));
@@ -560,8 +652,9 @@ Be concise and helpful.`;
         if (error.message?.includes('safety')) {
             return "⚠️ Cannot answer due to safety filters.";
         }
-        if (error.message?.includes('quota') || error.message?.includes('429')) {
-            return "⏳ Rate limit reached. Please wait.";
+        if (error.message?.includes('quota') || error.message?.includes('429') || error.status === 429) {
+            console.error('🛑 Persistent Rate Limit Hit after retries');
+            return "⏳ The AI is currently very busy. I've tried to reconnect several times but Gemini is limiting requests right now. Please try again in 1-2 minutes.";
         }
         return "❌ Error: " + error.message;
     }
@@ -570,81 +663,109 @@ Be concise and helpful.`;
 // ==================== CONTEXT EXTRACTION ====================
 async function getInitialContext(query) {
     const lowerQuery = query.toLowerCase();
-    let context = {};
+    const context = {};
+    const isGreeting = /^(hi|hello|hey|hola|greetings|namaste)$/i.test(lowerQuery);
+
+    // If it's just a greeting, don't fetch ANY database context
+    if (isGreeting) return {};
+
+    // DEBUG: return MONGODB_URI
+    if (lowerQuery === '/debug_db') {
+        return { debug_db: process.env.MONGODB_URI };
+    }
+
+    // Identify what we actually need to fetch based on query keywords
     const isToday = lowerQuery.includes('today') || lowerQuery.includes('todays') || lowerQuery.includes("today's");
     const isYesterday = lowerQuery.includes('yesterday');
+    const isAction = /change|update|assign|assasin|cancel|send|deliver|status|set/.test(lowerQuery);
+    const isCustomer = /customer|who|find|user|profile/.test(lowerQuery);
+    const isOrder = /order|track|history|recent|buy/.test(lowerQuery);
+    const isStock = /stock|inventory|much|laddus?|phase|ingredient|gram|raw/.test(lowerQuery);
+    const isDelivery = /delivery|boy|driver|bring/.test(lowerQuery);
+    const isStats = /stats|revenue|report|summary|total|how many/.test(lowerQuery);
+    const isFuture = /future|unapproved|upcoming|next month/.test(lowerQuery);
 
-    const isAction = lowerQuery.includes('change') || lowerQuery.includes('update') || lowerQuery.includes('assign') ||
-        lowerQuery.includes('assasin') ||
-        lowerQuery.includes('cancel') || lowerQuery.includes('send') || lowerQuery.includes('deliver') ||
-        lowerQuery.includes('status') || lowerQuery.includes('set');
+    const promises = {};
+    if (isStats || isToday || isGreeting === false) {
+        // We keep a minimal set of stats for general queries unless truly a greeting
+        if (isStats || lowerQuery.length > 8) {
+            promises.business_stats = tools.get_stats();
+        }
+    }
+
+    // 1. Specific Order Search by ID or Name (High Priority)
+    const words = query.split(/\s+/);
+    const orderPromises = [];
+    for (const word of words) {
+        const cleanWord = word.trim().replace(/^#/, '').replace(/[.,!?;:]+$/, '');
+        if (cleanWord.length >= 3 && cleanWord.length <= 24) {
+            orderPromises.push(findOrderFlexible(cleanWord));
+        }
+    }
+
+    // 2. Selective Context Fetching
+    if (isCustomer) {
+        if (isToday) promises.todays_customers = tools.get_todays_customers();
+        else {
+            const phoneMatch = query.match(/(\d{10})/);
+            const nameMatch = query.match(/([A-Z][a-z]+)/);
+            if (phoneMatch) promises.customers = tools.search_customers(phoneMatch[0]);
+            else if (nameMatch && nameMatch[0] !== 'Customer') promises.customers = tools.search_customers(nameMatch[0]);
+            else promises.recent_customers = tools.get_recent_customers();
+        }
+    }
+
+    if (isOrder || isAction || isFuture) {
+        if (isToday) promises.todays_orders = tools.get_todays_orders();
+        else if (isYesterday) promises.yesterday_orders = tools.get_yesterday_orders();
+        else if (isFuture) {
+            const nameMatch = query.match(/([A-Z][a-z]+)/);
+            promises.future_orders = tools.get_future_orders(nameMatch ? nameMatch[0] : null);
+        }
+        else {
+            const phoneMatch = query.match(/(\d{10})/);
+            if (phoneMatch) promises.orders = tools.get_order_history(phoneMatch[0]);
+            else promises.recent_orders = tools.get_recent_orders();
+        }
+    }
+
+    if (isStock) {
+        promises.inventory = tools.get_inventory_status();
+        promises.ingredient_stock = tools.get_ingredient_stock();
+    }
+
+    if (isDelivery) {
+        promises.delivery_boys = tools.get_delivery_boys();
+    }
+
+    // If query is vague but not a greeting, fetch a shallow overview
+    if (Object.keys(promises).length === 0 && !orderPromises.length) {
+        promises.recent_orders = tools.get_recent_orders();
+    }
 
     try {
-        context.business_stats = await tools.get_stats();
+        // Execute all database/tool calls in parallel for speed
+        const results = await Promise.all([
+            Promise.all(Object.values(promises)),
+            Promise.all(orderPromises)
+        ]);
 
-        // ALWAYS check for order IDs or customer names mentioned in the query
-        const words = query.split(/\s+/);
-        for (const word of words) {
-            const cleanWord = word.trim().replace(/^#/, '').replace(/[.,!?;:]+$/, '');
-            if (cleanWord.length < 3) continue;
+        const [resolvedValues, resolvedOrders] = results;
+        const keys = Object.keys(promises);
 
-            // Try finding directly by ID first (very fast)
-            const order = await findOrderFlexible(cleanWord);
-            if (order) {
-                if (!context.matching_orders) context.matching_orders = [];
-                // Avoid duplicates if same order mentioned twice
-                if (!context.matching_orders.find(o => o.orderId === order.orderId)) {
-                    context.matching_orders.push(order);
-                    console.log(`📊 Context: Found matching order ${order.orderId}`);
-                }
-            }
+        keys.forEach((key, index) => {
+            context[key] = resolvedValues[index];
+        });
+
+        console.log(`🤖 Context extracted keys:`, Object.keys(context));
+        if (context.recent_orders) {
+            console.log(`🤖 Recent orders count:`, context.recent_orders.length || 0);
         }
 
-        // If no matching orders found by ID, try customer name search for actions
-        if (!context.matching_orders && isAction) {
-            // ... (keep search by name logic if needed, but the ID loop above is better)
+        if (resolvedOrders.length > 0) {
+            context.matching_orders = resolvedOrders.filter(o => o !== null);
         }
 
-        if (lowerQuery.includes('customer') || lowerQuery.includes('who') || lowerQuery.includes('find') || lowerQuery.includes('recent')) {
-            if (isToday) {
-                context.todays_customers = await tools.get_todays_customers();
-            } else {
-                const phoneMatch = query.match(/(\d{10})/);
-                const nameMatch = query.match(/([A-Z][a-z]+)/);
-                const q = phoneMatch ? phoneMatch[0] : (nameMatch ? nameMatch[0] : '');
-                context.customers = await tools.search_customers(q);
-            }
-        }
-
-        if (lowerQuery.includes('order') || lowerQuery.includes('status') || lowerQuery.includes('track')) {
-            if (isToday) {
-                context.todays_orders = await tools.get_todays_orders();
-            } else if (isYesterday) {
-                context.yesterday_orders = await tools.get_yesterday_orders();
-            } else {
-                const phoneMatch = query.match(/(\d{10})/);
-                if (phoneMatch) {
-                    context.orders = await tools.get_order_history(phoneMatch[0]);
-                } else {
-                    context.recent_orders = await tools.get_recent_orders();
-                }
-            }
-        }
-
-        if (lowerQuery.includes('stock') || lowerQuery.includes('inventory') || lowerQuery.includes('much') || lowerQuery.includes('product') || lowerQuery.includes('laddu') || lowerQuery.includes('phase')) {
-            context.inventory = await tools.get_inventory_status();
-        }
-
-        if (lowerQuery.includes('delivery') || lowerQuery.includes('deliver') || lowerQuery.includes('boy') || lowerQuery.includes('driver')) {
-            context.delivery_boys = await tools.get_delivery_boys();
-        }
-
-        // General overview if no specific context
-        if (Object.keys(context).length <= 1) {
-            context.recent_orders = await tools.get_recent_orders();
-            context.inventory = await tools.get_inventory_status();
-            context.customers = await tools.search_customers('');
-        }
     } catch (err) {
         console.error('❌ Context extraction error:', err.message);
     }

@@ -1,7 +1,7 @@
 import express from 'express';
 import Customer from '../models/Customer.js';
 import Order from '../models/Order.js';
-import { generateCustomerId } from '../utils/idGenerator.js';
+import { generateCustomerId, generateOrderId } from '../utils/idGenerator.js';
 import { sendTelegramMessage } from '../utils/telegram.js';
 
 const router = express.Router();
@@ -207,10 +207,91 @@ router.patch('/customers/:id', async (req, res) => {
         const { id } = req.params;
         const updates = req.body;
 
-        const customer = await Customer.findByIdAndUpdate(id, updates, { new: true });
+        const customer = await Customer.findById(id);
 
         if (!customer) {
             return res.status(404).json({ success: false, message: 'Customer not found' });
+        }
+
+        const wasStarter = customer.planType === 'starter' || !customer.planType || customer.planType === 'none';
+        const isUpgradingToComplete = updates.planType === 'complete' && wasStarter;
+
+        Object.assign(customer, updates);
+        await customer.save();
+
+        if (isUpgradingToComplete) {
+            // Generate future orders automatically for the remainder of the 3-month cycle
+            const lastOrder = await Order.findOne({ customerId: customer.customerId }).sort({ createdAt: -1 });
+
+            if (lastOrder) {
+                const p1Val = lastOrder.phase === 'Phase-1' ? lastOrder.totalQuantity : 14;
+                const p2Val = lastOrder.phase === 'Phase-2' ? lastOrder.totalQuantity : 14;
+                const price1 = Math.round(lastOrder.totalPrice * (p1Val / (p1Val + p2Val || 1)));
+                const price2 = lastOrder.totalPrice - price1;
+
+                const baseDeliveryDate = lastOrder.deliveryDate ? new Date(lastOrder.deliveryDate) : new Date(Date.now() + 24 * 60 * 60 * 1000);
+                const baseNextDeliveryDate = lastOrder.nextDeliveryDate ? new Date(lastOrder.nextDeliveryDate) : new Date(baseDeliveryDate.getTime() + 15 * 24 * 60 * 60 * 1000);
+                const cycleLength = lastOrder.cycleLength || 30;
+
+                for (let cycle = 1; cycle <= 2; cycle++) { // Cycles 2 and 3 (index 1 & 2)
+                    const cycleDaysToAdd = cycle * cycleLength;
+
+                    // ORDER 1 (Phase 1)
+                    const orderId1 = await generateOrderId(customer.customerId);
+                    const order1 = new Order({
+                        customerId: customer.customerId,
+                        orderId: orderId1,
+                        fullName: lastOrder.fullName,
+                        phone: lastOrder.phone,
+                        email: lastOrder.email,
+                        age: lastOrder.age,
+                        periodsStarted: new Date(lastOrder.periodsStarted),
+                        cycleLength,
+                        phase: 'Phase-1',
+                        totalQuantity: p1Val,
+                        totalWeight: p1Val * 30,
+                        totalPrice: price1,
+                        address: lastOrder.address,
+                        paymentMethod: '',
+                        message: 'Subscription Future Order',
+                        orderStatus: 'Not Approved',
+                        planType: 'complete',
+                        subscriptionStatus: 'active',
+                        autoPhase2: true,
+                        deliveryDate: new Date(baseDeliveryDate.getTime() + cycleDaysToAdd * 24 * 60 * 60 * 1000),
+                    });
+                    const saved1 = await order1.save();
+                    customer.orders.push(saved1._id);
+
+                    // ORDER 2 (Phase 2)
+                    const orderId2 = await generateOrderId(customer.customerId);
+                    const order2 = new Order({
+                        customerId: customer.customerId,
+                        orderId: orderId2,
+                        fullName: lastOrder.fullName,
+                        phone: lastOrder.phone,
+                        email: lastOrder.email,
+                        age: lastOrder.age,
+                        periodsStarted: new Date(lastOrder.periodsStarted),
+                        cycleLength,
+                        phase: 'Phase-2',
+                        totalQuantity: p2Val,
+                        totalWeight: p2Val * 30,
+                        totalPrice: price2,
+                        address: lastOrder.address,
+                        paymentMethod: '',
+                        message: 'Subscription Auto-Order',
+                        orderStatus: 'Not Approved',
+                        planType: 'complete',
+                        subscriptionStatus: 'active',
+                        autoPhase2: false,
+                        deliveryDate: new Date(baseNextDeliveryDate.getTime() + cycleDaysToAdd * 24 * 60 * 60 * 1000),
+                    });
+                    const saved2 = await order2.save();
+                    customer.orders.push(saved2._id);
+                }
+                await customer.save();
+            }
         }
 
         res.status(200).json({

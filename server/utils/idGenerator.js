@@ -1,40 +1,43 @@
 import Customer from '../models/Customer.js';
 import Order from '../models/Order.js';
 
-export const generateCustomerId = async () => {
+export const generateCustomerId = async (planType = 'standard') => {
     try {
-        // Find the last customer with an ID matching the pattern A[0-9]{3}
+        const isCompletePlan = planType?.toLowerCase() === 'complete' || planType === "🌼 Complete Plan";
+        const prefix = isCompletePlan ? '#AA' : '#A';
+        const digits = isCompletePlan ? 2 : 3;
+
+        // Find the last customer with an ID matching the specific pattern
+        const regex = new RegExp(`^${prefix.replace('#', '\\#')}\\d{${digits}}$`);
         const lastCustomer = await Customer.findOne({
-            customerId: { $regex: /^A\d{3}$/ }
+            customerId: { $regex: regex }
         }).sort({ customerId: -1 });
 
         if (!lastCustomer || !lastCustomer.customerId) {
-            return 'A001';
+            const startSeq = '1'.padStart(digits, '0');
+            return `${prefix}${startSeq}`;
         }
 
-        // Extract the number part (e.g., "001" from "A001")
-        const currentIdStr = lastCustomer.customerId.substring(1);
+        // Extract the number part
+        const currentIdStr = lastCustomer.customerId.substring(prefix.length);
         const currentIdNum = parseInt(currentIdStr, 10);
 
-        // Increment and pad with leading zeros
+        // Increment and pad
         const nextIdNum = currentIdNum + 1;
-        const nextIdStr = nextIdNum.toString().padStart(3, '0');
+        const nextIdStr = nextIdNum.toString().padStart(digits, '0');
 
-        return `A${nextIdStr}`;
+        return `${prefix}${nextIdStr}`;
     } catch (error) {
         console.error('Error generating customer ID:', error);
-        // Fallback or re-throw depending on desired safety
         throw error;
     }
 };
 
 export const generateOrderId = async (customerId) => {
     try {
-        // Pattern: {customerId}A{sequence} -> e.g., A001A01
-        // We look for orders belonging to this customerId
-        // Note: We need to look up orders that START with customerId + "A" followed by digits
+        // Pattern: {customerId}A{sequence} -> e.g., #A001A01 or #AA01A01
         const prefix = `${customerId}A`;
-        const regex = new RegExp(`^${prefix}\\d{2,}$`);
+        const regex = new RegExp(`^${prefix.replace('#', '\\#')}\\d{2,}$`);
 
         const lastOrder = await Order.findOne({
             orderId: { $regex: regex }
@@ -44,13 +47,10 @@ export const generateOrderId = async (customerId) => {
             return `${prefix}01`;
         }
 
-        // Extract suffix (everything after "A001A")
-        // Length of prefix is known
         const currentSeqStr = lastOrder.orderId.substring(prefix.length);
         const currentSeqNum = parseInt(currentSeqStr, 10);
 
         const nextSeqNum = currentSeqNum + 1;
-        // Pad with at least 2 zeros
         const nextSeqStr = nextSeqNum.toString().padStart(2, '0');
 
         return `${prefix}${nextSeqStr}`;
