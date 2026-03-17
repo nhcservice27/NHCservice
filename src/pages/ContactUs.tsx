@@ -1,5 +1,6 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Navbar } from "@/components/Navbar";
+import { Footer } from "@/components/Footer";
 import { Mail, Phone, MapPin, Building, Send, CheckCircle, MessageSquare, User } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -8,6 +9,10 @@ import { Textarea } from "@/components/ui/textarea";
 import { toast } from "sonner";
 
 const ContactUs = () => {
+  useEffect(() => {
+    document.title = "Contact Us | NHC Natural Health Care Services";
+  }, []);
+
   const [formData, setFormData] = useState({
     name: "",
     phone: "",
@@ -43,27 +48,31 @@ const ContactUs = () => {
       return;
     }
 
+    const API_BASE_URL = import.meta.env.VITE_API_URL || '/api';
+
     try {
-      // Simulate form submission (you can replace this with actual API call)
-      await new Promise((resolve) => setTimeout(resolve, 1000));
+      const res = await fetch(`${API_BASE_URL}/contact`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: formData.name.trim(),
+          phone: formData.phone.trim(),
+          message: formData.message.trim(),
+        }),
+      });
 
-      // Create mailto link as fallback
-      const subject = encodeURIComponent(`Contact Form Submission from ${formData.name}`);
-      const body = encodeURIComponent(
-        `Name: ${formData.name}\nPhone: ${formData.phone}\n\nMessage:\n${formData.message}`
-      );
-      const mailtoLink = `mailto:nhccycleharmony@gmail.com?subject=${subject}&body=${body}`;
+      const data = await res.json();
 
-      // Show success message
+      if (!res.ok || !data.success) {
+        throw new Error(data.message || 'Failed to send');
+      }
+
       toast.success("Message sent successfully!", {
         description: "We'll get back to you soon.",
       });
 
       setIsSubmitted(true);
       setFormData({ name: "", phone: "", message: "" });
-
-      // Optionally open email client (commented out to avoid popup)
-      // window.location.href = mailtoLink;
     } catch (error) {
       toast.error("Failed to send message", {
         description: "Please try again or contact us directly.",
@@ -74,16 +83,16 @@ const ContactUs = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-green-50 via-white to-emerald-50">
+    <div className="min-h-screen bg-gradient-to-br from-wellness-cream via-white to-wellness-pink/20">
       <Navbar />
 
-      <div className="container mx-auto px-4 py-16 md:py-24 max-w-6xl">
+      <div className="container mx-auto px-4 py-16 md:py-24 pt-24 max-w-6xl">
         {/* Header */}
         <div className="text-center mb-12">
-          <div className="inline-flex items-center justify-center w-16 h-16 bg-green-100 rounded-full mb-4">
-            <MessageSquare className="w-8 h-8 text-green-600" />
+          <div className="inline-flex items-center justify-center w-16 h-16 bg-wellness-green/10 rounded-full mb-4">
+            <MessageSquare className="w-8 h-8 text-wellness-green" />
           </div>
-          <h1 className="text-4xl md:text-5xl font-bold text-gray-900 mb-4">
+          <h1 className="font-heading text-4xl md:text-5xl font-bold text-gray-900 mb-4">
             Contact Us
           </h1>
           <p className="text-lg text-gray-600 max-w-2xl mx-auto">
@@ -95,9 +104,9 @@ const ContactUs = () => {
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
           {/* Contact Information */}
           <div className="space-y-6">
-            <div className="bg-white rounded-2xl shadow-lg p-8">
-              <h2 className="text-2xl font-bold text-gray-900 mb-6 flex items-center gap-2">
-                <Building className="w-6 h-6 text-green-600" />
+            <div className="bg-white/80 backdrop-blur-sm rounded-2xl shadow-lg p-8 border border-white/50">
+              <h2 className="font-heading text-2xl font-bold text-gray-900 mb-6 flex items-center gap-2">
+                <Building className="w-6 h-6 text-wellness-green" />
                 Get in Touch
               </h2>
               <p className="text-gray-700 leading-relaxed mb-6">
@@ -107,9 +116,9 @@ const ContactUs = () => {
 
               <div className="space-y-4">
                 {/* Business Name */}
-                <div className="flex items-start gap-4 p-4 bg-green-50 rounded-xl border border-green-100">
-                  <div className="p-2 bg-green-100 rounded-lg">
-                    <Building className="w-5 h-5 text-green-600" />
+                <div className="flex items-start gap-4 p-4 bg-wellness-green-light/20 rounded-xl border border-wellness-green/20">
+                  <div className="p-2 bg-wellness-green/10 rounded-lg">
+                    <Building className="w-5 h-5 text-wellness-green" />
                   </div>
                   <div>
                     <p className="font-semibold text-gray-900 text-sm uppercase tracking-wide">Business Name</p>
@@ -118,15 +127,15 @@ const ContactUs = () => {
                 </div>
 
                 {/* Email */}
-                <div className="flex items-start gap-4 p-4 bg-green-50 rounded-xl border border-green-100">
-                  <div className="p-2 bg-green-100 rounded-lg">
-                    <Mail className="w-5 h-5 text-green-600" />
+                <div className="flex items-start gap-4 p-4 bg-wellness-green-light/20 rounded-xl border border-wellness-green/20">
+                  <div className="p-2 bg-wellness-pink/10 rounded-lg">
+                    <Mail className="w-5 h-5 text-wellness-pink" />
                   </div>
                   <div>
                     <p className="font-semibold text-gray-900 text-sm uppercase tracking-wide">Email</p>
                     <a
                       href="mailto:nhccycleharmony@gmail.com"
-                      className="text-green-600 hover:text-green-700 hover:underline text-lg font-medium"
+                      className="text-wellness-green hover:text-wellness-green/80 hover:underline text-lg font-medium"
                     >
                       nhccycleharmony@gmail.com
                     </a>
@@ -134,15 +143,15 @@ const ContactUs = () => {
                 </div>
 
                 {/* Phone */}
-                <div className="flex items-start gap-4 p-4 bg-green-50 rounded-xl border border-green-100">
-                  <div className="p-2 bg-green-100 rounded-lg">
-                    <Phone className="w-5 h-5 text-green-600" />
+                <div className="flex items-start gap-4 p-4 bg-wellness-green-light/20 rounded-xl border border-wellness-green/20">
+                  <div className="p-2 bg-wellness-green/10 rounded-lg">
+                    <Phone className="w-5 h-5 text-wellness-green" />
                   </div>
                   <div>
                     <p className="font-semibold text-gray-900 text-sm uppercase tracking-wide">Phone</p>
                     <a
                       href="tel:+919347122416"
-                      className="text-green-600 hover:text-green-700 hover:underline text-lg font-medium"
+                      className="text-wellness-green hover:text-wellness-green/80 hover:underline text-lg font-medium"
                     >
                       +91 93471 22416
                     </a>
@@ -150,20 +159,20 @@ const ContactUs = () => {
                 </div>
 
                 {/* Location */}
-                <div className="flex items-start gap-4 p-4 bg-green-50 rounded-xl border border-green-100">
-                  <div className="p-2 bg-green-100 rounded-lg">
-                    <MapPin className="w-5 h-5 text-green-600" />
+                <div className="flex items-start gap-4 p-4 bg-wellness-green-light/20 rounded-xl border border-wellness-green/20">
+                  <div className="p-2 bg-wellness-yellow/20 rounded-lg">
+                    <MapPin className="w-5 h-5 text-yellow-600" />
                   </div>
                   <div>
-                    <p className="font-semibold text-gray-900 text-sm uppercase tracking-wide">Location</p>
-                    <p className="text-gray-700 text-lg">Hyderabad, Telangana, India</p>
+                    <p className="font-semibold text-gray-900 text-sm uppercase tracking-wide">Delivery Area</p>
+                    <p className="text-gray-700 text-lg">Hyderabad Only</p>
                   </div>
                 </div>
               </div>
 
               <div className="mt-6 pt-6 border-t border-gray-200">
                 <p className="text-sm text-gray-600">
-                  <strong>Business Hours:</strong> Monday - Saturday, 9:00 AM - 6:00 PM IST
+                  <strong>Business Hours:</strong> Monday - Sunday, 9:00 AM - 6:00 PM IST
                 </p>
                 <p className="text-sm text-gray-600 mt-2">
                   We typically respond within 24-48 hours during business days.
@@ -174,16 +183,16 @@ const ContactUs = () => {
 
           {/* Contact Form */}
           <div className="space-y-6">
-            <div className="bg-white rounded-2xl shadow-lg p-8">
-              <h2 className="text-2xl font-bold text-gray-900 mb-6 flex items-center gap-2">
-                <Send className="w-6 h-6 text-green-600" />
+            <div className="bg-white/80 backdrop-blur-sm rounded-2xl shadow-lg p-8 border border-white/50">
+              <h2 className="font-heading text-2xl font-bold text-gray-900 mb-6 flex items-center gap-2">
+                <Send className="w-6 h-6 text-wellness-green" />
                 Send us a Message
               </h2>
 
               {isSubmitted ? (
                 <div className="text-center py-8">
-                  <div className="inline-flex items-center justify-center w-16 h-16 bg-green-100 rounded-full mb-4">
-                    <CheckCircle className="w-8 h-8 text-green-600" />
+                  <div className="inline-flex items-center justify-center w-16 h-16 bg-wellness-green/10 rounded-full mb-4">
+                    <CheckCircle className="w-8 h-8 text-wellness-green" />
                   </div>
                   <h3 className="text-xl font-bold text-gray-900 mb-2">Thank You!</h3>
                   <p className="text-gray-600 mb-6">
@@ -191,7 +200,7 @@ const ContactUs = () => {
                   </p>
                   <Button
                     onClick={() => setIsSubmitted(false)}
-                    className="bg-green-600 hover:bg-green-700"
+                    className="bg-wellness-green hover:bg-wellness-green/90"
                   >
                     Send Another Message
                   </Button>
@@ -212,7 +221,7 @@ const ContactUs = () => {
                         placeholder="Your full name"
                         value={formData.name}
                         onChange={handleChange}
-                        className="pl-10 border-gray-300 focus:border-green-500 focus:ring-green-500"
+                        className="pl-10 border-gray-300 focus:border-wellness-green focus:ring-wellness-green"
                         required
                       />
                     </div>
@@ -232,7 +241,7 @@ const ContactUs = () => {
                         placeholder="+91 1234567890"
                         value={formData.phone}
                         onChange={handleChange}
-                        className="pl-10 border-gray-300 focus:border-green-500 focus:ring-green-500"
+                        className="pl-10 border-gray-300 focus:border-wellness-green focus:ring-wellness-green"
                         required
                       />
                     </div>
@@ -250,7 +259,7 @@ const ContactUs = () => {
                       value={formData.message}
                       onChange={handleChange}
                       rows={6}
-                      className="border-gray-300 focus:border-green-500 focus:ring-green-500 resize-none"
+                      className="border-gray-300 focus:border-wellness-green focus:ring-wellness-green resize-none"
                       required
                     />
                   </div>
@@ -259,7 +268,7 @@ const ContactUs = () => {
                   <Button
                     type="submit"
                     disabled={isSubmitting}
-                    className="w-full bg-green-600 hover:bg-green-700 text-white font-medium py-6 text-lg"
+                    className="w-full bg-wellness-green hover:bg-wellness-green/90 text-white font-medium py-6 text-lg"
                   >
                     {isSubmitting ? (
                       <>
@@ -276,7 +285,7 @@ const ContactUs = () => {
 
                   <p className="text-xs text-gray-500 text-center">
                     By submitting this form, you agree to our{" "}
-                    <a href="/privacy-policy" className="text-green-600 hover:underline">
+                    <a href="/privacy-policy" className="text-wellness-green hover:underline">
                       Privacy Policy
                     </a>
                     .
@@ -286,9 +295,9 @@ const ContactUs = () => {
             </div>
 
             {/* Additional Info Card */}
-            <div className="bg-gradient-to-br from-green-50 to-emerald-50 rounded-xl p-6 border border-green-100">
+            <div className="bg-gradient-to-br from-wellness-green-light/20 to-wellness-pink/20 rounded-xl p-6 border border-wellness-green/20">
               <h3 className="font-semibold text-gray-900 mb-2 flex items-center gap-2">
-                <MessageSquare className="w-5 h-5 text-green-600" />
+                <MessageSquare className="w-5 h-5 text-wellness-green" />
                 Quick Response
               </h3>
               <p className="text-sm text-gray-700">
@@ -299,6 +308,8 @@ const ContactUs = () => {
           </div>
         </div>
       </div>
+
+      <Footer />
     </div>
   );
 };

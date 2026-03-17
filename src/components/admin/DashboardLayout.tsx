@@ -53,19 +53,35 @@ export function DashboardLayout({
                     <div className="flex items-center gap-2">
                         <h1 className="text-lg font-extrabold text-gray-900 tracking-tight">Admin<span className="text-pink-600">Panel</span></h1>
                     </div>
-                    <Button variant="ghost" size="icon" onClick={() => setMobileMenuOpen(!mobileMenuOpen)}>
-                        {mobileMenuOpen ? <X className="h-6 w-6" /> : <Menu className="h-6 w-6" />}
-                    </Button>
+                    <div className="flex items-center gap-1">
+                        <Button variant="ghost" size="icon" className="relative" onClick={() => { setActiveTab('notifications'); setMobileMenuOpen(false); }} title="Contact Messages">
+                            <Bell className="w-5 h-5 text-gray-500" />
+                            <span className="absolute top-2 right-2 w-2 h-2 bg-pink-500 rounded-full"></span>
+                        </Button>
+                        <Button variant="ghost" size="icon" onClick={() => setMobileMenuOpen(!mobileMenuOpen)}>
+                            {mobileMenuOpen ? <X className="h-6 w-6" /> : <Menu className="h-6 w-6" />}
+                        </Button>
+                    </div>
                 </header>
 
                 {/* Desktop Header (Optional, if we want a top bar for search/user) */}
                 <header className="hidden md:flex bg-white border-b border-gray-100 px-8 py-4 items-center justify-between">
                     <div>
-                        <h2 className="text-xl font-bold text-gray-800 capitalize">{activeTab}</h2>
-                        <p className="text-sm text-gray-500">Manage your store's {activeTab}</p>
+                        <h2 className="text-xl font-bold text-gray-800 capitalize">
+                            {activeTab === 'notifications' ? 'Contact Messages' : activeTab}
+                        </h2>
+                        <p className="text-sm text-gray-500">
+                            {activeTab === 'notifications' ? 'View contact form submissions' : `Manage your store's ${activeTab}`}
+                        </p>
                     </div>
                     <div className="flex items-center gap-4">
-                        <Button variant="ghost" size="icon" className="relative text-gray-500 hover:text-gray-700">
+                        <Button
+                            variant="ghost"
+                            size="icon"
+                            className="relative text-gray-500 hover:text-gray-700"
+                            onClick={() => setActiveTab('notifications')}
+                            title="Contact Messages"
+                        >
                             <Bell className="w-5 h-5" />
                             <span className="absolute top-2 right-2 w-2 h-2 bg-pink-500 rounded-full"></span>
                         </Button>

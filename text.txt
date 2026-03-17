@@ -870,3 +870,4 @@ this is the deployment plan for the project:
 4.git fetch origin
 5.git reset --hard origin/main
 3.pm2 start server.js --name nhc-backend
+6.~/NHCservice/server$ pm2 start server.js --name nhc-backend

@@ -18,6 +18,8 @@ import Checkout from "./pages/Checkout";
 import ConfirmOrder from "./pages/ConfirmOrder";
 import SeedCyclingBenefits from "./pages/SeedCyclingBenefits";
 import ResetPassword from "./pages/ResetPassword";
+import About from "./pages/About";
+import ContactUs from "./pages/ContactUs";
 
 import { UserProvider } from "./context/UserContext";
 
@@ -32,6 +34,8 @@ const App = () => (
         <BrowserRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
           <Routes>
             <Route path="/" element={<Index />} />
+            <Route path="/about" element={<About />} />
+            <Route path="/contact" element={<ContactUs />} />
             <Route path="/shop" element={<ShopNow />} />
             <Route path="/privacy-policy" element={<PrivacyPolicy />} />
             <Route path="/terms-conditions" element={<TermsConditions />} />

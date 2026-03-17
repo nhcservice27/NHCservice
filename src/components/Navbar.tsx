@@ -9,8 +9,8 @@ export function Navbar() {
 
     const navLinks = [
         { href: "/shop", label: "SHOP NOW" },
-        { href: "/#about", label: "ABOUT" },
-        { href: "/#contact", label: "CONTACT US" },
+        { href: "/about", label: "ABOUT" },
+        { href: "/contact", label: "CONTACT US" },
     ];
 
     return (

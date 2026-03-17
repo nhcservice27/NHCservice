@@ -46,13 +46,13 @@ export function Footer() {
                         <h3 className="font-heading font-bold text-xl text-gray-800 relative inline-block after:content-[''] after:absolute after:-bottom-2 after:left-0 after:w-12 after:h-1 after:bg-wellness-pink after:rounded-full">Quick Links</h3>
                         <ul className="space-y-4 text-gray-600">
                             <li>
-                                <a href="/#about" className="flex items-center gap-2 hover:text-wellness-green hover:translate-x-1 transition-all group">
+                                <a href="/about" className="flex items-center gap-2 hover:text-wellness-green hover:translate-x-1 transition-all group">
                                     <span className="w-1.5 h-1.5 rounded-full bg-gray-300 group-hover:bg-wellness-green transition-colors"></span>
                                     About Us
                                 </a>
                             </li>
                             <li>
-                                <a href="/#contact" className="flex items-center gap-2 hover:text-wellness-green hover:translate-x-1 transition-all group">
+                                <a href="/contact" className="flex items-center gap-2 hover:text-wellness-green hover:translate-x-1 transition-all group">
                                     <span className="w-1.5 h-1.5 rounded-full bg-gray-300 group-hover:bg-wellness-green transition-colors"></span>
                                     Contact
                                 </a>
