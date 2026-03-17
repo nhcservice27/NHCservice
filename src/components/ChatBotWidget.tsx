@@ -6,6 +6,23 @@ import { useUser } from "@/context/UserContext";
 const API_BASE_URL = import.meta.env.VITE_API_URL || '/api';
 const CUSTOMER_TOKEN_KEY = "cycle_harmony_customer_token";
 
+const normalizeApiBase = (value: string) => value.replace(/\/+$/, "");
+
+const getChatbotEndpointCandidates = () => {
+  const configuredBase = normalizeApiBase(API_BASE_URL.trim() || "/api");
+  const candidates = new Set<string>();
+
+  candidates.add(`${configuredBase}/chatbot/chat`);
+
+  if (!/\/api$/i.test(configuredBase)) {
+    candidates.add(`${configuredBase}/api/chatbot/chat`);
+  }
+
+  candidates.add("/api/chatbot/chat");
+
+  return Array.from(candidates);
+};
+
 interface Message {
   role: "user" | "assistant";
   content: string;
@@ -34,18 +51,12 @@ export function ChatBotWidget() {
     scrollToBottom();
   }, [messages]);
 
-  const handleSend = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!input.trim() || isLoading) return;
+  const sendChatRequest = async (userMessage: string, sessionId?: string) => {
+    const token = localStorage.getItem(CUSTOMER_TOKEN_KEY);
+    let lastPayload: any = null;
 
-    const userMessage = input.trim();
-    setInput("");
-    setMessages((prev) => [...prev, { role: "user", content: userMessage }]);
-    setIsLoading(true);
-
-    try {
-      const token = localStorage.getItem(CUSTOMER_TOKEN_KEY);
-      const res = await fetch(`${API_BASE_URL}/chatbot/chat`, {
+    for (const endpoint of getChatbotEndpointCandidates()) {
+      const res = await fetch(endpoint, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -59,6 +70,27 @@ export function ChatBotWidget() {
       });
 
       const data = await res.json();
+      lastPayload = data;
+
+      if (res.ok || data?.message !== "Route not found") {
+        return data;
+      }
+    }
+
+    return lastPayload;
+  };
+
+  const handleSend = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!input.trim() || isLoading) return;
+
+    const userMessage = input.trim();
+    setInput("");
+    setMessages((prev) => [...prev, { role: "user", content: userMessage }]);
+    setIsLoading(true);
+
+    try {
+      const data = await sendChatRequest(userMessage, sessionId || undefined);
 
       if (data.success) {
         if (data.sessionId) setSessionId(data.sessionId);
