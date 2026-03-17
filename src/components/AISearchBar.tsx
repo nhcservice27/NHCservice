@@ -53,7 +53,7 @@ export const AISearchBar = () => {
           aria-label="Open AI Search"
         >
           <Sparkles className="h-4 w-4 md:h-6 md:w-6" />
-          <span className="font-medium pr-2 text-sm md:text-base">Ask AI</span>
+          <span className="font-medium pr-2 text-sm md:text-base">Ask Me</span>
         </button>
       )}
 

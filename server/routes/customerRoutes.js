@@ -1,7 +1,9 @@
 import express from 'express';
 import crypto from 'crypto';
+import jwt from 'jsonwebtoken';
 import Customer from '../models/Customer.js';
 import Order from '../models/Order.js';
+import { protectCustomer } from '../middleware/auth.js';
 import { generateCustomerId, generateOrderId } from '../utils/idGenerator.js';
 import { sendTelegramMessage } from '../utils/telegram.js';
 import { sendEmail } from '../utils/email.js';
@@ -15,6 +17,29 @@ const getFrontendBaseUrl = () => {
     if (FRONTEND_BASE_URL) return FRONTEND_BASE_URL;
     if (process.env.NODE_ENV === 'development') return 'http://localhost:8080';
     return [...(process.env.ALLOWED_ORIGINS || '').split(',')].map(o => o.trim()).find(o => o.startsWith('https://') && !o.includes('localhost')) || 'https://cycle-harmony.netlify.app';
+};
+
+const buildCustomerToken = (customer) => {
+    if (!process.env.JWT_SECRET) {
+        throw new Error('JWT_SECRET is not defined');
+    }
+
+    return jwt.sign({
+        customerId: customer._id,
+        phone: customer.phone,
+        email: customer.email || null
+    }, process.env.JWT_SECRET, { expiresIn: '7d' });
+};
+
+const setCustomerCookie = (res, customer) => {
+    const token = buildCustomerToken(customer);
+
+    res.cookie('customerToken', token, {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === 'production',
+        sameSite: 'strict',
+        maxAge: 7 * 24 * 60 * 60 * 1000
+    });
 };
 
 // Check if customer exists by phone
@@ -123,6 +148,7 @@ router.post('/customers/register', async (req, res) => {
 
         const customerData = customer.toObject();
         delete customerData.password;
+        setCustomerCookie(res, customer);
 
         try {
             const telegramMsg = `
@@ -275,6 +301,8 @@ router.post('/customer-login', async (req, res) => {
             isEmail ? { email: identity.trim() } : { phone: identity.trim() }
         ).sort({ createdAt: -1 });
 
+        setCustomerCookie(res, customer);
+
         res.status(200).json({
             success: true,
             customer: customerData,
@@ -319,6 +347,8 @@ router.post('/customer-set-password', async (req, res) => {
         const orders = await Order.find(
             isEmail ? { email: identity.trim() } : { phone: identity.trim() }
         ).sort({ createdAt: -1 });
+
+        setCustomerCookie(res, customer);
 
         res.status(200).json({
             success: true,
@@ -430,6 +460,40 @@ router.post('/customer-reset-password', async (req, res) => {
         });
     } catch (error) {
         console.error('Reset password error:', error);
+        res.status(500).json({ success: false, message: 'Server error' });
+    }
+});
+
+router.post('/customer-logout', (req, res) => {
+    res.clearCookie('customerToken', {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === 'production',
+        sameSite: 'strict'
+    });
+
+    res.status(200).json({
+        success: true,
+        message: 'Logged out successfully'
+    });
+});
+
+router.get('/customer-session', protectCustomer, async (req, res) => {
+    try {
+        const customer = await Customer.findById(req.customerAuth.customerId);
+
+        if (!customer) {
+            return res.status(404).json({
+                success: false,
+                message: 'Customer session not found'
+            });
+        }
+
+        res.status(200).json({
+            success: true,
+            customer
+        });
+    } catch (error) {
+        console.error('Error restoring customer session:', error);
         res.status(500).json({ success: false, message: 'Server error' });
     }
 });

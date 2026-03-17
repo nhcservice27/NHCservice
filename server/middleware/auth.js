@@ -1,5 +1,13 @@
 import jwt from 'jsonwebtoken';
 
+const getVerifiedToken = (token) => {
+    if (!process.env.JWT_SECRET) {
+        throw new Error('JWT_SECRET is not defined');
+    }
+
+    return jwt.verify(token, process.env.JWT_SECRET);
+};
+
 const protect = (req, res, next) => {
     let token;
 
@@ -17,14 +25,8 @@ const protect = (req, res, next) => {
         });
     }
 
-    if (!process.env.JWT_SECRET) {
-        console.error("FATAL ERROR: JWT_SECRET is not defined.");
-        return res.status(500).json({ success: false, message: 'Internal server error' });
-    }
-
     try {
-        // Verify JWT token
-        const decoded = jwt.verify(token, process.env.JWT_SECRET);
+        const decoded = getVerifiedToken(token);
         req.user = decoded; // { userId, username, role }
         next();
     } catch (error) {
@@ -48,4 +50,42 @@ const authorizeRole = (...roles) => {
     };
 };
 
-export { protect, authorizeRole };
+const protectCustomer = (req, res, next) => {
+    const token = req.cookies?.customerToken;
+
+    if (!token) {
+        return res.status(401).json({
+            success: false,
+            message: 'Please log in to access your customer data'
+        });
+    }
+
+    try {
+        req.customerAuth = getVerifiedToken(token);
+        next();
+    } catch (error) {
+        return res.status(401).json({
+            success: false,
+            message: 'Invalid or expired customer session'
+        });
+    }
+};
+
+const attachOptionalCustomer = (req, res, next) => {
+    const token = req.cookies?.customerToken;
+
+    if (!token) {
+        req.customerAuth = null;
+        return next();
+    }
+
+    try {
+        req.customerAuth = getVerifiedToken(token);
+    } catch (error) {
+        req.customerAuth = null;
+    }
+
+    next();
+};
+
+export { protect, authorizeRole, protectCustomer, attachOptionalCustomer };

@@ -22,6 +22,7 @@ import customerRoutes from './routes/customerRoutes.js';
 import ingredientRoutes from './routes/ingredientRoutes.js';
 import authRoutes from './routes/authRoutes.js';
 import contactRoutes from './routes/contactRoutes.js';
+import chatbotRoutes from './routes/chatbotRoutes.js';
 import { startTelegramListener } from './utils/telegramListener.js';
 
 // Initialize Express app
@@ -92,6 +93,7 @@ app.use('/api', orderRoutes);
 app.use('/api', customerRoutes);
 app.use('/api', ingredientRoutes);
 app.use('/api', contactRoutes);
+app.use('/api', chatbotRoutes);
 
 // Health check endpoint
 app.get('/health', (req, res) => {

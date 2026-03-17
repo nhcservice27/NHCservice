@@ -49,7 +49,7 @@ interface UserContextType {
     login: (identity: string, password: string) => Promise<LoginResult>;
     register: (data: RegisterData) => Promise<{ success: boolean }>;
     setPassword: (identity: string, password: string) => Promise<{ success: boolean }>;
-    logout: () => void;
+    logout: () => Promise<void>;
     updateCustomerData: (data: Partial<Customer>) => void;
 }
 
@@ -60,6 +60,40 @@ export const UserProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     const [isLoggedIn, setIsLoggedIn] = useState(false);
     const [loading, setLoading] = useState(false);
 
+    useEffect(() => {
+        const restoreSession = async () => {
+            try {
+                const apiBase = import.meta.env.VITE_API_URL || "/api";
+                const response = await fetch(`${apiBase}/customer-session`, {
+                    credentials: "include",
+                });
+
+                if (!response.ok) {
+                    setCustomer(null);
+                    setIsLoggedIn(false);
+                    return;
+                }
+
+                const data = await response.json();
+                if (data.success && data.customer) {
+                    setCustomer(data.customer);
+                    setIsLoggedIn(true);
+                    if (data.customer.email) {
+                        localStorage.setItem("cycle_harmony_user_identity", data.customer.email);
+                    } else if (data.customer.phone) {
+                        localStorage.setItem("cycle_harmony_user_identity", data.customer.phone);
+                    }
+                }
+            } catch (error) {
+                console.error("Restore session error:", error);
+                setCustomer(null);
+                setIsLoggedIn(false);
+            }
+        };
+
+        restoreSession();
+    }, []);
+
     const login = async (identity: string, password: string): Promise<LoginResult> => {
         setLoading(true);
         try {
@@ -67,6 +101,7 @@ export const UserProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
             const response = await fetch(`${apiBase}/customer-login`, {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
+                credentials: "include",
                 body: JSON.stringify({ identity: identity.trim(), password }),
             });
             const data = await response.json();
@@ -94,11 +129,22 @@ export const UserProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         }
     };
 
-    const logout = () => {
-        setCustomer(null);
-        setIsLoggedIn(false);
-        localStorage.removeItem("cycle_harmony_user_identity");
-        toast.info("Logged out successfully");
+    const logout = async () => {
+        const apiBase = import.meta.env.VITE_API_URL || "/api";
+
+        try {
+            await fetch(`${apiBase}/customer-logout`, {
+                method: "POST",
+                credentials: "include",
+            });
+        } catch (error) {
+            console.error("Logout error:", error);
+        } finally {
+            setCustomer(null);
+            setIsLoggedIn(false);
+            localStorage.removeItem("cycle_harmony_user_identity");
+            toast.info("Logged out successfully");
+        }
     };
 
     const register = async (data: RegisterData): Promise<{ success: boolean }> => {
@@ -108,6 +154,7 @@ export const UserProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
             const response = await fetch(`${apiBase}/customers/register`, {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
+                credentials: "include",
                 body: JSON.stringify(data),
             });
             const res = await response.json();
@@ -137,6 +184,7 @@ export const UserProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
             const response = await fetch(`${apiBase}/customer-set-password`, {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
+                credentials: "include",
                 body: JSON.stringify({ identity: identity.trim(), password }),
             });
             const data = await response.json();

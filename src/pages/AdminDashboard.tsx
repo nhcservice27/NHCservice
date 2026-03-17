@@ -23,6 +23,7 @@ import { InventoryStatus } from "@/components/admin/InventoryStatus";
 import { OrderRequests } from "@/components/admin/OrderRequests";
 import { FutureRequests } from "@/components/admin/FutureRequests";
 import { ContactMessages } from "@/components/admin/ContactMessages";
+import { ChatbotSettings } from "@/components/admin/ChatbotSettings";
 import { formatDate } from "@/lib/utils";
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || '/api';
@@ -717,6 +718,10 @@ export default function AdminDashboard() {
 
       {activeTab === 'notifications' && (
         <ContactMessages />
+      )}
+
+      {activeTab === 'chatbot' && (
+        <ChatbotSettings />
       )}
 
       {/* --- Dialogs --- */}

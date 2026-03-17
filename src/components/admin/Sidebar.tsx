@@ -1,4 +1,4 @@
-import { LayoutDashboard, Users, ShoppingBag, BarChart3, LogOut, X, Package, MessageCircle, Calendar, Bell } from "lucide-react";
+import { LayoutDashboard, Users, ShoppingBag, BarChart3, LogOut, X, Package, MessageCircle, Calendar, Bell, Bot } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
 interface SidebarProps {
@@ -119,6 +119,19 @@ export function Sidebar({ activeTab, setActiveTab, mobileMenuOpen, setMobileMenu
                         >
                             <Bell className={`w-5 h-5 mr-3 ${activeTab === 'notifications' ? 'text-pink-600' : 'text-gray-400'}`} />
                             Contact Messages
+                        </Button>
+
+                        {/* Chat bot - Customer Chat History */}
+                        <Button
+                            variant="ghost"
+                            onClick={() => { setActiveTab('chatbot'); setMobileMenuOpen(false); }}
+                            className={`w-full justify-start transition-all duration-200 ${activeTab === 'chatbot'
+                                ? 'bg-pink-50 text-pink-700 font-semibold shadow-sm'
+                                : 'text-gray-600 hover:bg-white/50 hover:text-gray-900'
+                                }`}
+                        >
+                            <Bot className={`w-5 h-5 mr-3 ${activeTab === 'chatbot' ? 'text-pink-600' : 'text-gray-400'}`} />
+                            Chat bot
                         </Button>
 
                         {/* Future Requests */}

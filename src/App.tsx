@@ -21,6 +21,7 @@ import SeedCyclingBenefits from "./pages/SeedCyclingBenefits";
 import ResetPassword from "./pages/ResetPassword";
 import About from "./pages/About";
 import ContactUs from "./pages/ContactUs";
+import { ChatBotWidget } from "./components/ChatBotWidget";
 
 import { UserProvider } from "./context/UserContext";
 
@@ -40,6 +41,27 @@ function HashRedirect({ children }: { children: React.ReactNode }) {
   }, [location.pathname, location.hash, navigate]);
 
   return <>{children}</>;
+}
+
+const CHATBOT_PATHS = new Set([
+  "/",
+  "/about",
+  "/contact",
+  "/shop",
+  "/privacy-policy",
+  "/terms-conditions",
+  "/shipping-policy",
+  "/refund-policy",
+]);
+
+function GlobalChatbot() {
+  const location = useLocation();
+
+  if (!CHATBOT_PATHS.has(location.pathname)) {
+    return null;
+  }
+
+  return <ChatBotWidget />;
 }
 
 const App = () => (
@@ -68,6 +90,7 @@ const App = () => (
             <Route path="/seed-cycling-benefits" element={<SeedCyclingBenefits />} />
             <Route path="*" element={<NotFound />} />
           </Routes>
+          <GlobalChatbot />
         </BrowserRouter>
       </TooltipProvider>
     </UserProvider>
