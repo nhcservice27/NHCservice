@@ -860,3 +860,9 @@ I will be acting as a tester for the Cycle Harmony Laddus project. Below are the
 
 Testing will be performed using automated scripts (curl/browser subagent) and manual checks.
 
+
+
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////
+this is the deployment plan for the project:
+
+1. git pull origin main && npm run build && sudo rm -rf /var/www/nhcservice/* && sudo cp -r dist/* /var/www/nhcservice/ && sudo systemctl reload nginx

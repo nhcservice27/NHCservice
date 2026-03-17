@@ -47,7 +47,7 @@ CRITICAL - ADMINISTRATIVE AUTHORITY:
 - When the admin (the user) asks you to perform an action, DO IT IMMEDIATELY.
 - Do NOT hesitate or say you need a "database of delivery boys". If the user says "assign Ram", then newValue is "Ram".
 - Do NOT say you need a "mail template". The system has BUILT-IN templates that are triggered automatically.
-- Handle typos gracefully: If the user says "Assasin", they mean "Assign". If they say "sent the mail", use type: send_email.
+- Handle typos gracefully: If the user says "Assasin", they mean "Assign". If they say "sent the mail", use type: send_email. If they say "conform" or "states to conform", they mean "confirm" (status Confirmed).
 
 CRITICAL - ORDER ID RULES:
 - Each order has two IDs: "orderId" (like "A004A01") and "_id" (MongoDB internal ID)
@@ -70,7 +70,7 @@ newValue: Shipped
 RULES FOR ACTION BLOCK:
 1. Do NOT put any * or ** or backticks around ---ACTION--- or ---END_ACTION---
 2. The orderId should be the display orderId like A005A01 (NOT the MongoDB _id)
-3. The type must be one of: update_status, assign_delivery, send_email, update_stock, cancel_order
+3. The type must be one of: update_status, assign_delivery, send_email, update_stock, cancel_order, set_delivery_date, confirm_order
 4. Always include the customer name
 5. For assign_delivery, newValue should be the delivery boy's name (e.g., Ram)
 
@@ -103,11 +103,29 @@ newValue: Shipped
 🔄 Status: Processing ➜ *Shipped*
 
 VALID STATUS VALUES: Pending, Confirmed, Processing, Shipped, Delivered, Cancelled
-ACTION TYPES: update_status, assign_delivery, send_email, update_stock, cancel_order, set_delivery_date
+ACTION TYPES: update_status, assign_delivery, send_email, update_stock, cancel_order, set_delivery_date, confirm_order
 
 FOR set_delivery_date:
 - newValue must be an ISO date string (YYYY-MM-DD).
 - Use the provided "CURRENT DATE AND TIME" to calculate "today", "tomorrow", etc.
+
+CRITICAL - CONFIRM ORDER (status → Confirmed):
+- When user asks to change status to "Confirmed" or "confirm" an order, you MUST ask for the expected delivery date FIRST.
+- Do NOT execute update_status to Confirmed without a delivery date.
+- Reply: "To confirm this order, please provide the expected delivery date (e.g., 2026-03-21 or tomorrow)."
+- When user provides the date in their next message, use type: confirm_order with orderId and deliveryDate (ISO format YYYY-MM-DD).
+- Example ACTION BLOCK for confirm_order:
+---ACTION---
+type: confirm_order
+orderId: A002A01
+customer: ramya
+deliveryDate: 2026-03-21
+---END_ACTION---
+
+CRITICAL - ACCURACY RULES:
+1. NEVER use names from the examples (like "Anu" or "Ramu") if you don't see them in the provided CONTEXT DATA.
+2. If the user asks for a name and the CONTEXT DATA is empty or does not contain a clear name, ask for clarification or state that you cannot find the record.
+3. PRIORITIZE data in the "CONTEXT DATA FROM DATABASE" section over any examples.
 
 FORMATTING RULES:
 - Use Telegram Markdown: *bold* for labels
@@ -178,7 +196,7 @@ const tools = {
 
     get_recent_customers: async () => {
         try {
-            return await Customer.find({}).sort({ createdAt: -1 }).limit(5);
+            return await Customer.find({}).sort({ createdAt: -1 }).limit(10);
         } catch (err) {
             console.error('Recent customers error:', err.message);
             return { error: 'Failed to get recent customers' };
@@ -187,7 +205,7 @@ const tools = {
 
     get_recent_orders: async () => {
         try {
-            return await Order.find({ orderStatus: { $ne: 'Not Approved' } }).sort({ createdAt: -1 }).limit(5);
+            return await Order.find({ orderStatus: { $ne: 'Not Approved' } }).sort({ createdAt: -1 }).limit(10);
         } catch (err) {
             console.error('Recent orders error:', err.message);
             return { error: 'Failed to get recent orders' };
@@ -353,8 +371,14 @@ async function findOrderFlexible(identifier) {
         }
     } catch (e) { /* not a valid ObjectId */ }
 
-    // 2. Try by orderId field (like A005A01)
-    const byOrderId = await Order.findOne({ orderId: new RegExp(`^${cleanId}$`, 'i') });
+    // 2. Try by orderId field (like A005A01 or #A005A01 - DB may store with or without #)
+    const escaped = cleanId.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const byOrderId = await Order.findOne({
+        $or: [
+            { orderId: new RegExp(`^${escaped}$`, 'i') },
+            { orderId: new RegExp(`^#${escaped}$`, 'i') }
+        ]
+    });
     if (byOrderId) {
         console.log(`🔍 ✅ Found by orderId: ${byOrderId.orderId}`);
         return byOrderId;
@@ -479,6 +503,27 @@ const actionTools = {
             console.error('Set delivery date error:', err.message);
             return { success: false, error: err.message };
         }
+    },
+
+    confirm_order: async ({ orderId, deliveryDate }) => {
+        try {
+            const order = await findOrderFlexible(orderId);
+            if (!order) return { success: false, error: `Order not found for: ${orderId}` };
+
+            const deliveryDateObj = new Date(deliveryDate);
+            if (isNaN(deliveryDateObj.getTime())) {
+                return { success: false, error: `Invalid date format: ${deliveryDate}. Please use YYYY-MM-DD.` };
+            }
+
+            order.orderStatus = 'Confirmed';
+            order.deliveryDate = deliveryDateObj;
+            await order.save();
+            console.log(`✅ DB UPDATED: Order ${order.fullName} (${order.orderId}) → Confirmed, delivery: ${deliveryDate}`);
+            return { success: true, order };
+        } catch (err) {
+            console.error('Confirm order error:', err.message);
+            return { success: false, error: err.message };
+        }
     }
 };
 
@@ -527,12 +572,12 @@ function parseActionBlock(response) {
 }
 
 async function executeAction(action) {
-    const { type, orderId, newValue, customer } = action;
+    const { type, orderId, newValue, customer, deliveryDate } = action;
     if (!type) return { success: false, error: 'No action type' };
 
     // Use orderId first; if that fails, the findOrderFlexible will try customer name too
     const searchId = orderId || customer;
-    console.log(`🔧 Executing: type=${type}, searchId=${searchId}, newValue=${newValue}`);
+    console.log(`🔧 Executing: type=${type}, searchId=${searchId}, newValue=${newValue}, deliveryDate=${deliveryDate}`);
 
     switch (type) {
         case 'update_status':
@@ -547,6 +592,8 @@ async function executeAction(action) {
             return await actionTools.cancel_order({ orderId: searchId });
         case 'set_delivery_date':
             return await actionTools.set_delivery_date({ orderId: searchId, newValue });
+        case 'confirm_order':
+            return await actionTools.confirm_order({ orderId: searchId, deliveryDate: deliveryDate || newValue });
         default:
             return { success: false, error: `Unknown action type: ${type}` };
     }
@@ -678,7 +725,7 @@ async function getInitialContext(query) {
     const isToday = lowerQuery.includes('today') || lowerQuery.includes('todays') || lowerQuery.includes("today's");
     const isYesterday = lowerQuery.includes('yesterday');
     const isAction = /change|update|assign|assasin|cancel|send|deliver|status|set/.test(lowerQuery);
-    const isCustomer = /customer|who|find|user|profile/.test(lowerQuery);
+    const isCustomer = /customer|who|find|user|profile|name/.test(lowerQuery);
     const isOrder = /order|track|history|recent|buy/.test(lowerQuery);
     const isStock = /stock|inventory|much|laddus?|phase|ingredient|gram|raw/.test(lowerQuery);
     const isDelivery = /delivery|boy|driver|bring/.test(lowerQuery);

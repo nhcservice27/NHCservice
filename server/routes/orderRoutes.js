@@ -653,11 +653,17 @@ router.post('/orders', validateOrderParams, async (req, res) => {
       console.error('Legacy stock decrement error:', err);
     }
 
-    // 3. Send Telegram Notification
+    // 3. Send Telegram Notification (for all new orders including Requested status)
     try {
+      const orderStatus = req.body.orderStatus || 'Pending';
+      const isRequested = orderStatus === 'Requested';
+      const headerEmoji = isRequested ? '📬' : '🛍️';
+      const headerText = isRequested ? 'New Request Received! (Awaiting Customer Confirmation)' : 'New Order Received!';
+
       let telegramMsg = `
-🛍️ *New Order Received!*
+${headerEmoji} *${headerText}*
 ------------------------
+*Status:* ${orderStatus}
 *Customer:* ${fullName}
 *Phone:* ${phone}
 *Plan:* ${planType === 'complete' ? 'Complete Balance' : 'Starter'}

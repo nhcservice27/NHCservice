@@ -205,30 +205,48 @@ export const CycleCompanion = () => {
     const currentPhaseName = result.phase === 'Phase-1' ? 'Phase 1' : 'Phase 2';
     const starterPhaseName = (result.starterPhase || result.phase) === 'Phase-1' ? 'Phase 1' : 'Phase 2';
 
-    const baseMessage = `Your last period started ${result.total_days_passed} days ago, so you are currently in **${currentPhaseName}** of your cycle (${result.current_phase_start} to ${result.current_phase_end}). 🌷`;
+    // Phase 1 & Phase 2 dates for clear display (Phase 1 = follicular, Phase 2 = luteal)
+    const phase1Dates = result.phase === 'Phase-1'
+      ? `${result.current_phase_start} to ${result.current_phase_end}`
+      : `${result.next_phase_start} to ${result.next_phase_end}`;
+    const phase2Dates = result.phase === 'Phase-2'
+      ? `${result.current_phase_start} to ${result.current_phase_end}`
+      : `${result.next_phase_start} to ${result.next_phase_end}`;
+
+    const baseMessage = `Your last period started ${result.total_days_passed} days ago, so you are currently in ${currentPhaseName} of your cycle (${result.current_phase_start} to ${result.current_phase_end}). 🌷`;
 
     if (plan === 'starter') {
+      const datesSection = `\n\n📅 Your cycle dates:\n• Phase 1 (Follicular): ${phase1Dates}\n• Phase 2 (Luteal): ${phase2Dates}`;
+
+      const upcomingPhaseDates = isPhase1Starter ? phase1Dates : phase2Dates;
       const quantityText = result.isNextPhaseAdvance
-        ? `Since this phase is almost over, we're getting you ready for the next one! We will send you ${result.quantity} ${starterPhaseName} Laddus (${starterSeeds}) for your upcoming ${starterPhaseName} (${result.next_phase_start} to ${result.next_phase_end}).`
-        : `To support your body right now, we will send you ${result.quantity} ${starterPhaseName} Laddus (${starterSeeds}) to cover the rest of this current phase.`;
+        ? `\n\nSince this phase is almost over, we're getting you ready for the next one! We will send you ${result.quantity} ${starterPhaseName} Laddus (${starterSeeds}) for your upcoming ${starterPhaseName} (${upcomingPhaseDates}).`
+        : `\n\nTo support your body right now, we will send you ${result.quantity} ${starterPhaseName} Laddus (${starterSeeds}) to cover the rest of this current phase.`;
 
-      const note = `\n\n*Note: Your actual cycle may vary based on your lifestyle and body.*`;
+      const note = `\n\nNote: Your cycle may change based on your lifestyle — the laddus count may change.`;
 
-      return `Hi ${name} ma’am! 🌸\n\n${baseMessage}\n\n${quantityText}${note}`;
+      return `Hi ${name} ma’am! 🌸\n\n${baseMessage}${datesSection}${quantityText}${note}`;
     } else {
       const q1 = isPhase1Complete ? result.complete_plan?.phase1_qty : result.complete_plan?.phase2_qty;
       const q2 = isPhase1Complete ? result.complete_plan?.phase2_qty : result.complete_plan?.phase1_qty;
       const p1 = isPhase1Complete ? '1' : '2';
       const p2 = isPhase1Complete ? '2' : '1';
 
+      const delivery1DateStr = new Date(result.next_delivery_date!).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' });
+      const delivery2DateStr = result.phase === 'Phase-2' ? (result.next_phase_end || delivery1DateStr) : delivery1DateStr;
+      const p1Seeds = isPhase1Complete ? 'Flax + Pumpkin' : 'Sunflower + Sesame';
+      const p2Seeds = isPhase1Complete ? 'Sunflower + Sesame' : 'Flax + Pumpkin';
+
+      const datesSection = `\n\n📅 Your cycle dates:\n• Phase 1 (Follicular): ${phase1Dates}\n• Phase 2 (Luteal): ${phase2Dates}`;
+
       let preamble = "";
       if (result.isNextPhaseAdvance) {
-        preamble = `Since this phase is almost over, we're starting your complete 30-day supply from your NEXT phase to keep things balanced! (${starterPhaseName} begins on ${result.next_phase_start}).\n\n`;
+        preamble = `\n\nSince this phase is almost over, we're starting your complete supply from your next phase to keep things balanced!\n\n`;
       }
 
-      const note = `\n\n*Note: Your actual cycle may vary based on your lifestyle and body.*`;
+      const note = `\n\nNote: Your cycle may change based on your lifestyle — the laddus count may change.`;
 
-      return `Hi ${name} ma’am! 🌸\n\n${baseMessage}\n\n${preamble}✨ **Complete Balance Plan:**\nWe will send you ${q1} Phase-${p1} laddus now.\nThen, we will automatically deliver ${q2} Phase-${p2} laddus on ${new Date(result.next_delivery_date!).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })}.\n\nStatus: Subscription Active ✅ | 10% Discount Applied 💰${note}`;
+      return `Hi ${name} ma’am! 🌸\n\n${baseMessage}${datesSection}${preamble}✨ Complete Balance Plan (Subscription):\n\n• Delivery 1: ${q1} Phase 1 laddus (Flax + Pumpkin) — we will deliver ${result.phase === 'Phase-2' ? `on ${delivery1DateStr} when your next phase begins` : 'now'}.\n• Delivery 2: ${q2} Phase 2 laddus (Sunflower + Sesame) — we will deliver on ${delivery2DateStr} automatically.\n\n📌 How it works: You get the full cycle covered. Phase 1 laddus arrive when your next period phase begins, and Phase 2 laddus arrive automatically when Phase 2 begins — no need to order again!\n\n✅ Subscription Active | 💰 10% Discount Applied${note}`;
     }
   };
 
@@ -397,9 +415,30 @@ export const CycleCompanion = () => {
                       <h5 className="font-bold text-gray-800 mb-2">
                         {selectedPlan === 'starter' ? 'Cycle Starter Plan' : 'Complete Balance Plan'}
                       </h5>
-                      <p className="text-sm text-gray-600 leading-relaxed whitespace-pre-line">
-                        {generateMessageForPlan(selectedPlan)}
-                      </p>
+                      <div className="text-sm text-gray-600 leading-relaxed whitespace-pre-line space-y-3">
+                        {(() => {
+                          const msg = generateMessageForPlan(selectedPlan);
+                          if (selectedPlan === 'complete' && msg.includes('Delivery 1') && msg.includes('Delivery 2')) {
+                            const parts = msg.split(/(?=• Delivery 1:)/);
+                            if (parts.length === 2) {
+                              const [before, rest] = parts;
+                              const deliveryEnd = rest.indexOf('\n\n📌');
+                              const deliveryPart = deliveryEnd >= 0 ? rest.slice(0, deliveryEnd) : rest;
+                              const afterPart = deliveryEnd >= 0 ? rest.slice(deliveryEnd) : '';
+                              return (
+                                <>
+                                  <span>{before.trim()}</span>
+                                  <div className="px-3 py-2 my-2">
+                                    <span className="font-bold">{deliveryPart.trim()}</span>
+                                  </div>
+                                  <span>{afterPart.trim()}</span>
+                                </>
+                              );
+                            }
+                          }
+                          return <span>{msg}</span>;
+                        })()}
+                      </div>
                     </div>
 
                     {/* Order Summary Card (Matching user screenshot) */}
