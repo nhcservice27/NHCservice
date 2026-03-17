@@ -376,7 +376,15 @@ export default function CustomerProfile() {
             <Navbar />
 
             <div className="container mx-auto px-4 py-8 pt-24 max-w-6xl">
-                {!isLoggedIn ? (
+                {loading ? (
+                    <div className="max-w-md mx-auto mt-10">
+                        <Card className="shadow-2xl border-none bg-white/80 backdrop-blur-md">
+                            <CardContent className="py-12 text-center text-gray-500">
+                                Restoring your session...
+                            </CardContent>
+                        </Card>
+                    </div>
+                ) : !isLoggedIn ? (
                     <div className="max-w-md mx-auto mt-10">
                         <Card className="shadow-2xl border-none bg-white/80 backdrop-blur-md">
                             <CardHeader className="text-center pb-8 border-b border-pink-50">

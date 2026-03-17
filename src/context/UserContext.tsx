@@ -64,7 +64,7 @@ const getCustomerAuthHeaders = (): HeadersInit => {
 export const UserProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
     const [customer, setCustomer] = useState<Customer | null>(null);
     const [isLoggedIn, setIsLoggedIn] = useState(false);
-    const [loading, setLoading] = useState(false);
+    const [loading, setLoading] = useState(true);
 
     useEffect(() => {
         const restoreSession = async () => {
@@ -98,6 +98,8 @@ export const UserProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
                 console.error("Restore session error:", error);
                 setCustomer(null);
                 setIsLoggedIn(false);
+            } finally {
+                setLoading(false);
             }
         };
 

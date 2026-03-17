@@ -1,5 +1,5 @@
-
 import { Facebook, Instagram, Mail, Phone, MapPin } from "lucide-react";
+import { Link } from "react-router-dom";
 import logo from "@/assets/logo-nhc.jpg";
 
 export function Footer() {
@@ -46,22 +46,22 @@ export function Footer() {
                         <h3 className="font-heading font-bold text-xl text-gray-800 relative inline-block after:content-[''] after:absolute after:-bottom-2 after:left-0 after:w-12 after:h-1 after:bg-wellness-pink after:rounded-full">Quick Links</h3>
                         <ul className="space-y-4 text-gray-600">
                             <li>
-                                <a href="/about" className="flex items-center gap-2 hover:text-wellness-green hover:translate-x-1 transition-all group">
+                                <Link to="/about" className="flex items-center gap-2 hover:text-wellness-green hover:translate-x-1 transition-all group">
                                     <span className="w-1.5 h-1.5 rounded-full bg-gray-300 group-hover:bg-wellness-green transition-colors"></span>
                                     About Us
-                                </a>
+                                </Link>
                             </li>
                             <li>
-                                <a href="/contact" className="flex items-center gap-2 hover:text-wellness-green hover:translate-x-1 transition-all group">
+                                <Link to="/contact" className="flex items-center gap-2 hover:text-wellness-green hover:translate-x-1 transition-all group">
                                     <span className="w-1.5 h-1.5 rounded-full bg-gray-300 group-hover:bg-wellness-green transition-colors"></span>
                                     Contact
-                                </a>
+                                </Link>
                             </li>
                             <li>
-                                <a href="/shop" className="flex items-center gap-2 hover:text-wellness-green hover:translate-x-1 transition-all group">
+                                <Link to="/shop" className="flex items-center gap-2 hover:text-wellness-green hover:translate-x-1 transition-all group">
                                     <span className="w-1.5 h-1.5 rounded-full bg-gray-300 group-hover:bg-wellness-green transition-colors"></span>
                                     Shop Laddus
-                                </a>
+                                </Link>
                             </li>
                             <li>
                                 <a href="/#cycle-phase-checker" className="flex items-center gap-2 hover:text-wellness-green hover:translate-x-1 transition-all group">
@@ -77,16 +77,16 @@ export function Footer() {
                         <h3 className="font-heading font-bold text-xl text-gray-800 relative inline-block after:content-[''] after:absolute after:-bottom-2 after:left-0 after:w-12 after:h-1 after:bg-wellness-pink after:rounded-full">Policies</h3>
                         <ul className="space-y-4 text-gray-600">
                             <li>
-                                <a href="/privacy-policy" className="hover:text-wellness-green hover:underline underline-offset-4 transition-all decoration-wellness-green/30">Privacy Policy</a>
+                                <Link to="/privacy-policy" className="hover:text-wellness-green hover:underline underline-offset-4 transition-all decoration-wellness-green/30">Privacy Policy</Link>
                             </li>
                             <li>
-                                <a href="/terms-conditions" className="hover:text-wellness-green hover:underline underline-offset-4 transition-all decoration-wellness-green/30">Terms Conditions</a>
+                                <Link to="/terms-conditions" className="hover:text-wellness-green hover:underline underline-offset-4 transition-all decoration-wellness-green/30">Terms Conditions</Link>
                             </li>
                             <li>
-                                <a href="/shipping-policy" className="hover:text-wellness-green hover:underline underline-offset-4 transition-all decoration-wellness-green/30">Shipping Policy</a>
+                                <Link to="/shipping-policy" className="hover:text-wellness-green hover:underline underline-offset-4 transition-all decoration-wellness-green/30">Shipping Policy</Link>
                             </li>
                             <li>
-                                <a href="/refund-policy" className="hover:text-wellness-green hover:underline underline-offset-4 transition-all decoration-wellness-green/30">Refund</a>
+                                <Link to="/refund-policy" className="hover:text-wellness-green hover:underline underline-offset-4 transition-all decoration-wellness-green/30">Refund</Link>
                             </li>
                         </ul>
                     </div>

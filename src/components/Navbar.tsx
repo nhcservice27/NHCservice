@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { Link } from "react-router-dom";
 import logo from "@/assets/logo-nhc.jpg";
 import { User, Search, Menu, X } from "lucide-react";
 import { useUser } from "@/context/UserContext";
@@ -18,25 +19,25 @@ export function Navbar() {
             <div className="container mx-auto px-4 max-w-7xl flex justify-between items-center">
                 {/* Logo */}
                 <div className="flex items-center gap-3">
-                    <a href="/">
+                    <Link to="/">
                         <img
                             src={logo}
                             alt="NHC Natural Health Care Services"
                             className="h-12 w-12 md:h-16 md:w-16 object-contain rounded-full"
                         />
-                    </a>
+                    </Link>
                 </div>
 
                 {/* Desktop Navigation Links */}
                 <div className="hidden md:flex items-center gap-8">
                     {navLinks.map((link) => (
-                        <a
+                        <Link
                             key={link.label}
-                            href={link.href}
+                            to={link.href}
                             className="text-sm font-semibold tracking-wide text-gray-700 hover:text-pink-600 transition-colors"
                         >
                             {link.label}
-                        </a>
+                        </Link>
                     ))}
                 </div>
 
@@ -51,8 +52,8 @@ export function Navbar() {
                     </button>
 
                     {/* User Profile Icon */}
-                    <a
-                        href="/profile"
+                    <Link
+                        to="/profile"
                         className="flex items-center gap-2 group"
                         aria-label="Customer Profile"
                     >
@@ -64,7 +65,7 @@ export function Navbar() {
                         <div className="p-2 rounded-full bg-white/80 backdrop-blur-sm shadow-sm hover:shadow-md transition-all border border-pink-100 group-hover:border-pink-300">
                             <User className="h-5 w-5 text-pink-500" />
                         </div>
-                    </a>
+                    </Link>
 
                     {/* Mobile Menu Button */}
                     <button
@@ -86,14 +87,14 @@ export function Navbar() {
                 <div className="md:hidden bg-gradient-to-r from-wellness-cream/95 via-wellness-green-light/20 to-wellness-pink/20 backdrop-blur-md border-t border-white/30 shadow-lg">
                     <div className="container mx-auto px-4 py-4 flex flex-col gap-4">
                         {navLinks.map((link) => (
-                            <a
+                            <Link
                                 key={link.label}
-                                href={link.href}
+                                to={link.href}
                                 className="text-sm font-semibold tracking-wide text-gray-700 hover:text-pink-600 transition-colors py-2 border-b border-gray-100 last:border-b-0"
                                 onClick={() => setMobileMenuOpen(false)}
                             >
                                 {link.label}
-                            </a>
+                            </Link>
                         ))}
                     </div>
                 </div>
