@@ -120,35 +120,32 @@ const Checkout = () => {
 
         setLoading(true);
         try {
-            const response = await fetch(`${API_BASE_URL}/check-customer-by-email`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ email })
-            });
-            const data = await response.json();
+            const result = await globalLogin(email, password);
 
-            if (data.exists) {
-                setExistingCustomer(data.data);
-                setName(data.data.name);
-                setPhone(data.data.phone);
-                setAge(data.data.age);
-                if (data.data.addresses?.length > 0) {
-                    const lastAddr = data.data.addresses[data.data.addresses.length - 1];
+            if (result.success && result.customer) {
+                const cust = result.customer as { name: string; phone: string; age?: number; addresses?: Array<{ house?: string; area?: string; landmark?: string; pincode?: string; label?: string; mapLink?: string }> };
+                setName(cust.name);
+                setPhone(cust.phone);
+                if (cust.age) setAge(String(cust.age));
+                if (cust.addresses?.length) {
+                    const lastAddr = cust.addresses[cust.addresses.length - 1];
                     setAddress({
                         house: lastAddr.house || "",
                         area: lastAddr.area || "",
                         landmark: lastAddr.landmark || "",
                         mapLink: lastAddr.mapLink || "",
                         pincode: lastAddr.pincode || "",
-                        label: lastAddr.label || "Home"
+                        label: (lastAddr.label as "Home" | "Work" | "Other") || "Home"
                     });
                 }
+                setExistingCustomer(cust);
                 setStep(3);
-                // Sync with global context
-                await globalLogin(email);
                 toast.success("Welcome back!");
-            } else {
-                toast.info("Welcome! Please provide your details to continue.");
+            } else if (result.needsPasswordSetup) {
+                toast.info("Please set your password first in the Profile page.");
+                navigate("/profile");
+            } else if (!result.success) {
+                toast.info("New customer? Please provide your details to continue.");
                 setStep(2);
             }
         } catch (err) {

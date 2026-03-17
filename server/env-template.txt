@@ -9,3 +9,7 @@ PORT=5000
 # Allowed Origins for CORS (frontend URL)
 ALLOWED_ORIGINS=http://localhost:8080,http://localhost:5173
 
+# Frontend base URL for password reset links (e.g. https://your-app.cloudfront.net or your AWS domain)
+# Required for forgot-password emails to work correctly
+FRONTEND_BASE_URL=https://your-aws-frontend-url.com
+

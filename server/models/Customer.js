@@ -1,4 +1,5 @@
 import mongoose from 'mongoose';
+import bcrypt from 'bcryptjs';
 
 const customerSchema = new mongoose.Schema({
     customerId: {
@@ -26,6 +27,11 @@ const customerSchema = new mongoose.Schema({
     age: {
         type: Number,
         required: true
+    },
+    gender: {
+        type: String,
+        enum: ['male', 'female', 'other', 'prefer_not_to_say'],
+        trim: true
     },
     lastPeriodDate: {
         type: Date
@@ -63,10 +69,35 @@ const customerSchema = new mongoose.Schema({
     },
     shippingDate: {
         type: Date
+    },
+    password: {
+        type: String,
+        select: false
+    },
+    passwordResetToken: {
+        type: String,
+        select: false
+    },
+    passwordResetExpires: {
+        type: Date,
+        select: false
     }
 }, {
     timestamps: true
 });
+
+// Hash password before saving (only when password is set/modified)
+customerSchema.pre('save', async function (next) {
+    if (!this.isModified('password') || !this.password) return next();
+    const salt = await bcrypt.genSalt(10);
+    this.password = await bcrypt.hash(this.password, salt);
+    next();
+});
+
+customerSchema.methods.comparePassword = async function (candidatePassword) {
+    if (!this.password) return false;
+    return bcrypt.compare(candidatePassword, this.password);
+};
 
 const Customer = mongoose.model('Customer', customerSchema);
 

@@ -51,7 +51,7 @@ export const getOrderEmailTemplate = (order, type = 'confirmation') => {
     subject = `Order Update: ${order.orderStatus} - #${order.orderId || order._id.slice(-6).toUpperCase()}`;
   }
 
-  const baseUrl = "https://cycle-harmony.netlify.app"; // Fallback base URL
+  const baseUrl = (process.env.FRONTEND_BASE_URL || '').trim() || "https://cycle-harmony.netlify.app";
   const confirmUrl = `${baseUrl}/confirm-order/${order._id}`;
 
   const html = `
@@ -89,7 +89,7 @@ export const getOrderEmailTemplate = (order, type = 'confirmation') => {
         </div>
 
         <p style="text-align: center; margin-top: 32px;">
-          <a href="${isRequest ? confirmUrl : 'https://cycle-harmony.netlify.app/profile'}" style="background: #db2777; color: white; padding: 12px 24px; text-decoration: none; border-radius: 8px; font-weight: bold; display: inline-block;">
+          <a href="${isRequest ? confirmUrl : `${baseUrl}/profile`}" style="background: #db2777; color: white; padding: 12px 24px; text-decoration: none; border-radius: 8px; font-weight: bold; display: inline-block;">
             ${isRequest ? 'Confirm My Order' : 'Track My Order'}
           </a>
         </p>

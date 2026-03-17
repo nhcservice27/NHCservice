@@ -45,13 +45,6 @@ export function HeroSection() {
               className="relative w-full max-w-2xl h-auto object-contain drop-shadow-2xl hover:scale-105 transition-transform duration-700 z-10"
               style={{ transform: 'translateZ(50px)' }}
             />
-            {/* Floating Elements */}
-            <div className="absolute -top-10 -right-10 w-24 h-24 bg-white/40 backdrop-blur-md rounded-full shadow-lg flex items-center justify-center animate-bounce-slow delay-700" style={{ transform: 'translateZ(80px)' }}>
-              <span className="text-2xl">🌱</span>
-            </div>
-            <div className="absolute bottom-10 -left-10 w-20 h-20 bg-white/40 backdrop-blur-md rounded-full shadow-lg flex items-center justify-center animate-bounce-slow delay-1000" style={{ transform: 'translateZ(60px)' }}>
-              <span className="text-2xl">⚡</span>
-            </div>
           </div>
 
           <div className="flex lg:hidden w-full justify-center animate-in fade-in slide-in-from-bottom-4 duration-700 delay-500">

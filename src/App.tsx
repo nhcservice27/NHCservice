@@ -17,6 +17,7 @@ import RefundPolicy from "./pages/RefundPolicy";
 import Checkout from "./pages/Checkout";
 import ConfirmOrder from "./pages/ConfirmOrder";
 import SeedCyclingBenefits from "./pages/SeedCyclingBenefits";
+import ResetPassword from "./pages/ResetPassword";
 
 import { UserProvider } from "./context/UserContext";
 
@@ -40,6 +41,7 @@ const App = () => (
             <Route path="/admin/dashboard" element={<AdminDashboard />} />
             <Route path="/delivery/dashboard" element={<DeliveryDashboard />} />
             <Route path="/profile" element={<CustomerProfile />} />
+            <Route path="/reset-password" element={<ResetPassword />} />
             <Route path="/checkout" element={<Checkout />} />
             <Route path="/confirm-order/:orderId" element={<ConfirmOrder />} />
             <Route path="/seed-cycling-benefits" element={<SeedCyclingBenefits />} />

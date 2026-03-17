@@ -867,4 +867,6 @@ this is the deployment plan for the project:
 
 1. git pull origin main && npm run build && sudo rm -rf /var/www/nhcservice/* && sudo cp -r dist/* /var/www/nhcservice/ && sudo systemctl reload nginx
 2.cd ~/NHCservice/server
+4.git fetch origin
+5.git reset --hard origin/main
 3.pm2 start server.js --name nhc-backend

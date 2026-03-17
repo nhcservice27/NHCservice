@@ -1,10 +1,21 @@
 import express from 'express';
+import crypto from 'crypto';
 import Customer from '../models/Customer.js';
 import Order from '../models/Order.js';
 import { generateCustomerId, generateOrderId } from '../utils/idGenerator.js';
 import { sendTelegramMessage } from '../utils/telegram.js';
+import { sendEmail } from '../utils/email.js';
 
 const router = express.Router();
+
+// Set FRONTEND_BASE_URL in .env to your frontend URL (e.g. https://your-app.cloudfront.net for AWS)
+// In development, defaults to http://localhost:8080 for local testing
+const FRONTEND_BASE_URL = (process.env.FRONTEND_BASE_URL || '').trim();
+const getFrontendBaseUrl = () => {
+    if (FRONTEND_BASE_URL) return FRONTEND_BASE_URL;
+    if (process.env.NODE_ENV === 'development') return 'http://localhost:8080';
+    return [...(process.env.ALLOWED_ORIGINS || '').split(',')].map(o => o.trim()).find(o => o.startsWith('https://') && !o.includes('localhost')) || 'https://cycle-harmony.netlify.app';
+};
 
 // Check if customer exists by phone
 router.post('/check-customer', async (req, res) => {
@@ -64,6 +75,78 @@ router.post('/check-customer-by-email', async (req, res) => {
 
     } catch (error) {
         console.error('Error checking customer by email:', error);
+        res.status(500).json({ success: false, message: 'Server error' });
+    }
+});
+
+// Register new customer (email, name, phone, age, gender, password)
+router.post('/customers/register', async (req, res) => {
+    try {
+        const { email, name, phone, age, gender, password } = req.body;
+
+        if (!email?.trim() || !name?.trim() || !phone?.trim() || !age || !password) {
+            return res.status(400).json({
+                success: false,
+                message: 'Email, Name, Phone, Age, and Password are required'
+            });
+        }
+
+        if (password.length < 6) {
+            return res.status(400).json({
+                success: false,
+                message: 'Password must be at least 6 characters'
+            });
+        }
+
+        const existingByEmail = await Customer.findOne({ email: email.trim() });
+        if (existingByEmail) {
+            return res.status(400).json({ success: false, message: 'An account with this email already exists. Please login instead.' });
+        }
+
+        const existingByPhone = await Customer.findOne({ phone: phone.trim() });
+        if (existingByPhone) {
+            return res.status(400).json({ success: false, message: 'An account with this phone number already exists.' });
+        }
+
+        const newCustomerId = await generateCustomerId();
+        const customer = new Customer({
+            customerId: newCustomerId,
+            email: email.trim(),
+            phone: phone.trim(),
+            name: name.trim(),
+            age: Number(age),
+            gender: gender || undefined,
+            password,
+            addresses: []
+        });
+        await customer.save();
+
+        const customerData = customer.toObject();
+        delete customerData.password;
+
+        try {
+            const telegramMsg = `
+🆕 *New Customer Registered!*
+----------------------------
+*Name:* ${name}
+*Email:* ${email}
+*Phone:* ${phone}
+*Age:* ${age}
+*Gender:* ${gender || 'Not specified'}
+*Customer ID:* ${newCustomerId}
+            `;
+            await sendTelegramMessage(telegramMsg.trim());
+        } catch (err) {
+            console.error('Telegram notification error:', err);
+        }
+
+        res.status(201).json({
+            success: true,
+            message: 'Account created successfully',
+            customer: customerData
+        });
+    } catch (error) {
+        console.error('Error registering customer:', error);
         res.status(500).json({ success: false, message: 'Server error' });
     }
 });
@@ -145,6 +228,208 @@ router.get('/customers', async (req, res) => {
         });
     } catch (error) {
         console.error('Error fetching customers:', error);
+        res.status(500).json({ success: false, message: 'Server error' });
+    }
+});
+
+// Customer Login (email or phone + password)
+router.post('/customer-login', async (req, res) => {
+    try {
+        const { identity, password } = req.body;
+
+        if (!identity?.trim()) {
+            return res.status(400).json({ success: false, message: 'Email or phone number is required' });
+        }
+        if (!password) {
+            return res.status(400).json({ success: false, message: 'Password is required' });
+        }
+
+        const isEmail = identity.includes('@');
+        const query = isEmail ? { email: identity.trim() } : { phone: identity.trim() };
+        const customer = await Customer.findOne(query).select('+password');
+
+        if (!customer) {
+            return res.status(404).json({ success: false, message: 'Customer not found' });
+        }
+
+        // If customer has no password set (legacy), allow them to set one first
+        if (!customer.password) {
+            return res.status(200).json({
+                success: false,
+                needsPasswordSetup: true,
+                message: 'Please set your password first',
+                identity: identity.trim()
+            });
+        }
+
+        const isMatch = await customer.comparePassword(password);
+        if (!isMatch) {
+            return res.status(401).json({ success: false, message: 'Invalid password' });
+        }
+
+        // Return customer without password
+        const customerData = customer.toObject();
+        delete customerData.password;
+
+        const orders = await Order.find(
+            isEmail ? { email: identity.trim() } : { phone: identity.trim() }
+        ).sort({ createdAt: -1 });
+
+        res.status(200).json({
+            success: true,
+            customer: customerData,
+            orders
+        });
+    } catch (error) {
+        console.error('Error during customer login:', error);
+        res.status(500).json({ success: false, message: 'Server error' });
+    }
+});
+
+// Set password for existing customer (when they have no password yet)
+router.post('/customer-set-password', async (req, res) => {
+    try {
+        const { identity, password } = req.body;
+
+        if (!identity?.trim()) {
+            return res.status(400).json({ success: false, message: 'Email or phone number is required' });
+        }
+        if (!password || password.length < 6) {
+            return res.status(400).json({ success: false, message: 'Password must be at least 6 characters' });
+        }
+
+        const isEmail = identity.includes('@');
+        const query = isEmail ? { email: identity.trim() } : { phone: identity.trim() };
+        const customer = await Customer.findOne(query).select('+password');
+
+        if (!customer) {
+            return res.status(404).json({ success: false, message: 'Customer not found' });
+        }
+
+        if (customer.password) {
+            return res.status(400).json({ success: false, message: 'Password already set. Use login instead.' });
+        }
+
+        customer.password = password;
+        await customer.save();
+
+        const customerData = customer.toObject();
+        delete customerData.password;
+
+        const orders = await Order.find(
+            isEmail ? { email: identity.trim() } : { phone: identity.trim() }
+        ).sort({ createdAt: -1 });
+
+        res.status(200).json({
+            success: true,
+            message: 'Password set successfully',
+            customer: customerData,
+            orders
+        });
+    } catch (error) {
+        console.error('Error setting customer password:', error);
+        res.status(500).json({ success: false, message: 'Server error' });
+    }
+});
+
+// Forgot password - send reset link to email
+router.post('/customer-forgot-password', async (req, res) => {
+    try {
+        const { email } = req.body;
+
+        if (!email?.trim()) {
+            return res.status(400).json({ success: false, message: 'Email is required' });
+        }
+
+        const customer = await Customer.findOne({ email: email.trim() }).select('+passwordResetToken +passwordResetExpires');
+
+        if (!customer) {
+            return res.status(200).json({
+                success: true,
+                message: 'If an account exists with this email, you will receive a password reset link shortly.'
+            });
+        }
+
+        const resetToken = crypto.randomBytes(32).toString('hex');
+        customer.passwordResetToken = crypto.createHash('sha256').update(resetToken).digest('hex');
+        customer.passwordResetExpires = new Date(Date.now() + 60 * 60 * 1000);
+        await customer.save({ validateBeforeSave: false });
+
+        const baseUrl = getFrontendBaseUrl();
+        if (!FRONTEND_BASE_URL && process.env.NODE_ENV !== 'development') {
+            console.warn('FRONTEND_BASE_URL not set in .env - password reset links may point to wrong domain. Set it to your AWS frontend URL.');
+        }
+        const resetUrl = `${baseUrl}/reset-password?token=${resetToken}`;
+
+        const html = `
+            <div style="font-family: sans-serif; max-width: 600px; margin: auto; border: 1px solid #fce7f3; border-radius: 12px; overflow: hidden;">
+                <div style="background: linear-gradient(to right, #ec4899, #8b5cf6); padding: 24px; text-align: center; color: white;">
+                    <h1 style="margin: 0; font-size: 24px;">Cycle Harmony</h1>
+                    <p style="margin: 8px 0 0; opacity: 0.8;">Password Reset Request</p>
+                </div>
+                <div style="padding: 32px; color: #1f2937;">
+                    <h2 style="margin-top: 0;">Reset Your Password</h2>
+                    <p>Hi ${customer.name},</p>
+                    <p>You requested a password reset. Click the button below to set a new password. This link expires in 1 hour.</p>
+                    <p style="text-align: center; margin: 32px 0;">
+                        <a href="${resetUrl}" style="background: #db2777; color: white; padding: 12px 24px; text-decoration: none; border-radius: 8px; font-weight: bold; display: inline-block;">Reset Password</a>
+                    </p>
+                    <p style="font-size: 12px; color: #6b7280;">If you didn't request this, you can safely ignore this email.</p>
+                </div>
+            </div>
+        `;
+
+        await sendEmail({
+            to: customer.email,
+            subject: 'Cycle Harmony - Reset Your Password',
+            html
+        });
+
+        res.status(200).json({
+            success: true,
+            message: 'If an account exists with this email, you will receive a password reset link shortly.'
+        });
+    } catch (error) {
+        console.error('Forgot password error:', error);
+        res.status(500).json({ success: false, message: 'Server error' });
+    }
+});
+
+// Reset password with token from email
+router.post('/customer-reset-password', async (req, res) => {
+    try {
+        const { token, password } = req.body;
+
+        if (!token || !password) {
+            return res.status(400).json({ success: false, message: 'Token and new password are required' });
+        }
+
+        if (password.length < 6) {
+            return res.status(400).json({ success: false, message: 'Password must be at least 6 characters' });
+        }
+
+        const hashedToken = crypto.createHash('sha256').update(token).digest('hex');
+
+        const customer = await Customer.findOne({
+            passwordResetToken: hashedToken,
+            passwordResetExpires: { $gt: new Date() }
+        }).select('+password +passwordResetToken +passwordResetExpires');
+
+        if (!customer) {
+            return res.status(400).json({ success: false, message: 'Invalid or expired reset link. Please request a new one.' });
+        }
+
+        customer.password = password;
+        customer.passwordResetToken = undefined;
+        customer.passwordResetExpires = undefined;
+        await customer.save();
+
+        res.status(200).json({
+            success: true,
+            message: 'Password reset successfully. You can now login.'
+        });
+    } catch (error) {
+        console.error('Reset password error:', error);
         res.status(500).json({ success: false, message: 'Server error' });
     }
 });

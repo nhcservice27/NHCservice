@@ -31,8 +31,20 @@ const API_BASE_URL = import.meta.env.VITE_API_URL || '/api';
 
 export default function CustomerProfile() {
     const navigate = useNavigate();
-    const { customer, isLoggedIn, loading, login, logout, updateCustomerData } = useUser();
-    const [phone, setPhone] = useState("");
+    const { customer, isLoggedIn, loading, login, register, setPassword, logout, updateCustomerData } = useUser();
+    const [email, setEmail] = useState("");
+    const [authStep, setAuthStep] = useState<'email' | 'login' | 'register' | 'setPassword'>('email');
+    const [password, setPasswordInput] = useState("");
+    const [newPassword, setNewPassword] = useState("");
+    const [confirmPassword, setConfirmPassword] = useState("");
+    const [registerForm, setRegisterForm] = useState({
+        name: "",
+        phone: "",
+        age: "",
+        gender: ""
+    });
+    const [forgotPasswordOpen, setForgotPasswordOpen] = useState(false);
+    const [forgotPasswordEmail, setForgotPasswordEmail] = useState("");
     const [isProcessing, setIsProcessing] = useState(false);
     const [orders, setOrders] = useState<any[]>([]);
     const [searchParams, setSearchParams] = useSearchParams();
@@ -54,6 +66,14 @@ export default function CustomerProfile() {
         }
     }, [isLoggedIn, customer]);
 
+    useEffect(() => {
+        if (!isLoggedIn) {
+            setAuthStep("email");
+            const saved = localStorage.getItem("cycle_harmony_user_identity");
+            if (saved && saved.includes("@")) setEmail(saved);
+        }
+    }, [isLoggedIn]);
+
     const fetchOrders = async (customerId: string) => {
         try {
             const response = await fetch(`${API_BASE_URL}/customer-orders/${customerId}`);
@@ -72,18 +92,129 @@ export default function CustomerProfile() {
     const selectedOrder = orders.find(o => o._id === selectedOrderId) || null;
 
 
-    const handleLoginClick = async (val?: string) => {
-        const identity = val || phone;
-        if (!identity) {
-            toast.error("Please enter a valid detail");
+    const handleCheckEmail = async () => {
+        if (!email?.trim()) {
+            toast.error("Please enter your email");
             return;
         }
-        await login(identity);
+        if (!email.includes("@")) {
+            toast.error("Please enter a valid email address");
+            return;
+        }
+        setIsProcessing(true);
+        try {
+            const response = await fetch(`${API_BASE_URL}/check-customer-by-email`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ email: email.trim() }),
+            });
+            const data = await response.json();
+            if (data.exists) {
+                setAuthStep("login");
+            } else {
+                setAuthStep("register");
+            }
+        } catch (err) {
+            toast.error("Could not verify email");
+        } finally {
+            setIsProcessing(false);
+        }
     };
 
-    const handleGoogleLogin = () => {
-        const simulatedEmail = "user@gmail.com";
-        login(simulatedEmail);
+    const handleLoginClick = async () => {
+        if (!password) {
+            toast.error("Please enter your password");
+            return;
+        }
+        const result = await login(email.trim(), password);
+        if (result.needsPasswordSetup) {
+            setAuthStep("setPassword");
+        }
+    };
+
+    const handleRegister = async (e: React.FormEvent) => {
+        e.preventDefault();
+        if (!registerForm.name?.trim() || !registerForm.phone?.trim() || !registerForm.age || !password) {
+            toast.error("Please fill all required fields");
+            return;
+        }
+        if (password.length < 6) {
+            toast.error("Password must be at least 6 characters");
+            return;
+        }
+        if (password !== confirmPassword) {
+            toast.error("Passwords do not match");
+            return;
+        }
+        const result = await register({
+            email: email.trim(),
+            name: registerForm.name.trim(),
+            phone: registerForm.phone.trim(),
+            age: Number(registerForm.age),
+            gender: registerForm.gender || undefined,
+            password,
+        });
+        if (result.success) {
+            setRegisterForm({ name: "", phone: "", age: "", gender: "" });
+            setPasswordInput("");
+            setConfirmPassword("");
+        }
+    };
+
+    const handleSetPassword = async (e: React.FormEvent) => {
+        e.preventDefault();
+        if (!newPassword || newPassword.length < 6) {
+            toast.error("Password must be at least 6 characters");
+            return;
+        }
+        if (newPassword !== confirmPassword) {
+            toast.error("Passwords do not match");
+            return;
+        }
+        const result = await setPassword(email.trim(), newPassword);
+        if (result.success) {
+            setAuthStep("login");
+            setNewPassword("");
+            setConfirmPassword("");
+            setPasswordInput("");
+        }
+    };
+
+    const handleBackToEmail = () => {
+        setAuthStep("email");
+        setPasswordInput("");
+        setNewPassword("");
+        setConfirmPassword("");
+        setRegisterForm({ name: "", phone: "", age: "", gender: "" });
+    };
+
+    const handleForgotPassword = async (e: React.FormEvent) => {
+        e.preventDefault();
+        const resetEmail = forgotPasswordEmail.trim() || email.trim();
+        if (!resetEmail || !resetEmail.includes("@")) {
+            toast.error("Please enter a valid email address");
+            return;
+        }
+        setIsProcessing(true);
+        try {
+            const response = await fetch(`${API_BASE_URL}/customer-forgot-password`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ email: resetEmail }),
+            });
+            const data = await response.json();
+            if (data.success) {
+                toast.success("If an account exists with this email, you will receive a reset link shortly.");
+                setForgotPasswordOpen(false);
+                setForgotPasswordEmail("");
+            } else {
+                toast.error(data.message || "Something went wrong");
+            }
+        } catch (err) {
+            toast.error("Could not send reset email");
+        } finally {
+            setIsProcessing(false);
+        }
     };
 
     const handleNewAddress = async (e: React.FormEvent) => {
@@ -248,47 +379,263 @@ export default function CustomerProfile() {
                                 <div className="w-16 h-16 bg-pink-100 rounded-2xl flex items-center justify-center mx-auto mb-4 transform rotate-12">
                                     <ShoppingBag className="w-8 h-8 text-pink-500 transform -rotate-12" />
                                 </div>
-                                <CardTitle className="text-2xl font-bold bg-gradient-to-r from-pink-600 to-purple-600 bg-clip-text text-transparent">Track Your Journey</CardTitle>
+                                <CardTitle className="text-2xl font-bold bg-gradient-to-r from-pink-600 to-purple-600 bg-clip-text text-transparent">
+                                    {authStep === "email" && "Track Your Journey"}
+                                    {authStep === "login" && "Welcome Back"}
+                                    {authStep === "register" && "Create Your Account"}
+                                    {authStep === "setPassword" && "Set Your Password"}
+                                </CardTitle>
                                 <CardDescription className="text-gray-500 mt-2">
-                                    Access your wellness orders & profile
+                                    {authStep === "email" && "Enter your email to continue"}
+                                    {authStep === "login" && "Enter your password to access your profile"}
+                                    {authStep === "register" && "Fill in your details to create an account"}
+                                    {authStep === "setPassword" && "Create a password to secure your account"}
                                 </CardDescription>
                             </CardHeader>
                             <CardContent className="pt-8 space-y-6">
-                                <Button
-                                    onClick={handleGoogleLogin}
-                                    className="w-full h-12 text-md bg-white border border-gray-100 text-gray-700 hover:bg-gray-50 hover:border-pink-200 transition-all gap-3 shadow-sm"
-                                    disabled={loading}
-                                >
-                                    <img src="https://www.google.com/favicon.ico" className="w-5 h-5" alt="G" />
-                                    {loading ? "Connecting..." : "Continue with Google"}
-                                </Button>
-
-                                <div className="relative">
-                                    <div className="absolute inset-0 flex items-center"><span className="w-full border-t border-gray-100"></span></div>
-                                    <div className="relative flex justify-center text-xs uppercase"><span className="bg-white px-2 text-gray-400">or use phone</span></div>
-                                </div>
-
-                                <div className="space-y-4">
-                                    <div className="space-y-2">
-                                        <label className="text-xs font-bold text-gray-400 uppercase tracking-widest ml-1">Registered Phone</label>
-                                        <Input
-                                            type="tel"
-                                            placeholder="e.g. 9876543210"
-                                            value={phone}
-                                            onChange={(e) => setPhone(e.target.value)}
-                                            className="h-12 text-lg rounded-xl border-gray-200 focus:ring-pink-500"
-                                        />
+                                {authStep === "email" && (
+                                    <div className="space-y-4">
+                                        <div className="space-y-2">
+                                            <Label className="text-xs font-bold text-gray-400 uppercase tracking-widest ml-1">Email</Label>
+                                            <Input
+                                                type="email"
+                                                placeholder="your@email.com"
+                                                value={email}
+                                                onChange={(e) => setEmail(e.target.value)}
+                                                className="h-12 text-lg rounded-xl border-gray-200 focus:ring-pink-500"
+                                            />
+                                        </div>
+                                        <Button
+                                            className="w-full h-12 text-lg bg-gradient-to-r from-pink-500 to-purple-500 hover:from-pink-600 hover:to-purple-600 shadow-lg shadow-pink-200"
+                                            onClick={handleCheckEmail}
+                                            disabled={isProcessing}
+                                        >
+                                            {isProcessing ? "Checking..." : "Continue"}
+                                        </Button>
                                     </div>
-                                    <Button
-                                        className="w-full h-12 text-lg bg-gradient-to-r from-pink-500 to-purple-500 hover:from-pink-600 hover:to-purple-600 shadow-lg shadow-pink-200"
-                                        onClick={() => handleLoginClick()}
-                                        disabled={loading}
-                                    >
-                                        {loading ? "Fetching Profile..." : "View My Orders"}
-                                    </Button>
-                                </div>
+                                )}
+
+                                {authStep === "login" && (
+                                    <div className="space-y-4">
+                                        <div className="rounded-lg bg-pink-50 px-4 py-2 text-sm text-gray-600">
+                                            {email}
+                                        </div>
+                                        <div className="space-y-2">
+                                            <Label className="text-xs font-bold text-gray-400 uppercase tracking-widest ml-1">Password</Label>
+                                            <Input
+                                                type="password"
+                                                placeholder="Enter your password"
+                                                value={password}
+                                                onChange={(e) => setPasswordInput(e.target.value)}
+                                                className="h-12 text-lg rounded-xl border-gray-200 focus:ring-pink-500"
+                                            />
+                                        </div>
+                                        <button
+                                            type="button"
+                                            onClick={() => { setForgotPasswordEmail(email); setForgotPasswordOpen(true); }}
+                                            className="text-sm text-pink-600 hover:text-pink-700 hover:underline w-full text-left"
+                                        >
+                                            Forgot password?
+                                        </button>
+                                        <div className="flex gap-2">
+                                            <Button
+                                                type="button"
+                                                variant="outline"
+                                                className="flex-1"
+                                                onClick={handleBackToEmail}
+                                                disabled={loading}
+                                            >
+                                                Back
+                                            </Button>
+                                            <Button
+                                                className="flex-1 h-12 bg-gradient-to-r from-pink-500 to-purple-500 hover:from-pink-600 hover:to-purple-600"
+                                                onClick={handleLoginClick}
+                                                disabled={loading}
+                                            >
+                                                {loading ? "Logging in..." : "Login"}
+                                            </Button>
+                                        </div>
+                                    </div>
+                                )}
+
+                                {authStep === "register" && (
+                                    <form onSubmit={handleRegister} className="space-y-4">
+                                        <div className="rounded-lg bg-pink-50 px-4 py-2 text-sm text-gray-600">
+                                            {email}
+                                        </div>
+                                        <div className="space-y-2">
+                                            <Label className="text-xs font-bold text-gray-400 uppercase tracking-widest ml-1">Full Name *</Label>
+                                            <Input
+                                                placeholder="Your full name"
+                                                value={registerForm.name}
+                                                onChange={(e) => setRegisterForm(f => ({ ...f, name: e.target.value }))}
+                                                className="h-12 rounded-xl border-gray-200 focus:ring-pink-500"
+                                                required
+                                            />
+                                        </div>
+                                        <div className="space-y-2">
+                                            <Label className="text-xs font-bold text-gray-400 uppercase tracking-widest ml-1">Phone Number *</Label>
+                                            <Input
+                                                type="tel"
+                                                placeholder="e.g. 9876543210"
+                                                value={registerForm.phone}
+                                                onChange={(e) => setRegisterForm(f => ({ ...f, phone: e.target.value }))}
+                                                className="h-12 rounded-xl border-gray-200 focus:ring-pink-500"
+                                                required
+                                            />
+                                        </div>
+                                        <div className="space-y-2">
+                                            <Label className="text-xs font-bold text-gray-400 uppercase tracking-widest ml-1">Age *</Label>
+                                            <Input
+                                                type="number"
+                                                placeholder="e.g. 28"
+                                                value={registerForm.age}
+                                                onChange={(e) => setRegisterForm(f => ({ ...f, age: e.target.value }))}
+                                                className="h-12 rounded-xl border-gray-200 focus:ring-pink-500"
+                                                min={1}
+                                                max={120}
+                                                required
+                                            />
+                                        </div>
+                                        <div className="space-y-2">
+                                            <Label className="text-xs font-bold text-gray-400 uppercase tracking-widest ml-1">Gender</Label>
+                                            <select
+                                                value={registerForm.gender}
+                                                onChange={(e) => setRegisterForm(f => ({ ...f, gender: e.target.value }))}
+                                                className="flex h-12 w-full rounded-xl border border-gray-200 bg-white px-4 text-base focus:ring-2 focus:ring-pink-500"
+                                            >
+                                                <option value="">Select gender</option>
+                                                <option value="female">Female</option>
+                                                <option value="male">Male</option>
+                                                <option value="other">Other</option>
+                                                <option value="prefer_not_to_say">Prefer not to say</option>
+                                            </select>
+                                        </div>
+                                        <div className="space-y-2">
+                                            <Label className="text-xs font-bold text-gray-400 uppercase tracking-widest ml-1">Password *</Label>
+                                            <Input
+                                                type="password"
+                                                placeholder="At least 6 characters"
+                                                value={password}
+                                                onChange={(e) => setPasswordInput(e.target.value)}
+                                                className="h-12 rounded-xl border-gray-200 focus:ring-pink-500"
+                                                minLength={6}
+                                                required
+                                            />
+                                        </div>
+                                        <div className="space-y-2">
+                                            <Label className="text-xs font-bold text-gray-400 uppercase tracking-widest ml-1">Confirm Password *</Label>
+                                            <Input
+                                                type="password"
+                                                placeholder="Re-enter password"
+                                                value={confirmPassword}
+                                                onChange={(e) => setConfirmPassword(e.target.value)}
+                                                className="h-12 rounded-xl border-gray-200 focus:ring-pink-500"
+                                                minLength={6}
+                                                required
+                                            />
+                                        </div>
+                                        <div className="flex gap-2">
+                                            <Button
+                                                type="button"
+                                                variant="outline"
+                                                className="flex-1"
+                                                onClick={handleBackToEmail}
+                                                disabled={loading}
+                                            >
+                                                Back
+                                            </Button>
+                                            <Button
+                                                type="submit"
+                                                className="flex-1 h-12 bg-gradient-to-r from-pink-500 to-purple-500 hover:from-pink-600 hover:to-purple-600"
+                                                disabled={loading}
+                                            >
+                                                {loading ? "Creating..." : "Create Account"}
+                                            </Button>
+                                        </div>
+                                    </form>
+                                )}
+
+                                {authStep === "setPassword" && (
+                                    <form onSubmit={handleSetPassword} className="space-y-4">
+                                        <div className="rounded-lg bg-pink-50 px-4 py-2 text-sm text-gray-600">
+                                            {email}
+                                        </div>
+                                        <div className="space-y-2">
+                                            <Label className="text-xs font-bold text-gray-400 uppercase tracking-widest ml-1">New Password</Label>
+                                            <Input
+                                                type="password"
+                                                placeholder="At least 6 characters"
+                                                value={newPassword}
+                                                onChange={(e) => setNewPassword(e.target.value)}
+                                                className="h-12 text-lg rounded-xl border-gray-200 focus:ring-pink-500"
+                                                minLength={6}
+                                            />
+                                        </div>
+                                        <div className="space-y-2">
+                                            <Label className="text-xs font-bold text-gray-400 uppercase tracking-widest ml-1">Confirm Password</Label>
+                                            <Input
+                                                type="password"
+                                                placeholder="Re-enter password"
+                                                value={confirmPassword}
+                                                onChange={(e) => setConfirmPassword(e.target.value)}
+                                                className="h-12 text-lg rounded-xl border-gray-200 focus:ring-pink-500"
+                                                minLength={6}
+                                            />
+                                        </div>
+                                        <div className="flex gap-2">
+                                            <Button
+                                                type="button"
+                                                variant="outline"
+                                                className="flex-1"
+                                                onClick={() => setAuthStep("login")}
+                                                disabled={loading}
+                                            >
+                                                Back
+                                            </Button>
+                                            <Button
+                                                type="submit"
+                                                className="flex-1 h-12 bg-gradient-to-r from-pink-500 to-purple-500 hover:from-pink-600 hover:to-purple-600"
+                                                disabled={loading}
+                                            >
+                                                {loading ? "Setting..." : "Set Password & Login"}
+                                            </Button>
+                                        </div>
+                                    </form>
+                                )}
                             </CardContent>
                         </Card>
+
+                        <Dialog open={forgotPasswordOpen} onOpenChange={setForgotPasswordOpen}>
+                            <DialogContent className="sm:max-w-md">
+                                <DialogHeader>
+                                    <DialogTitle>Forgot Password</DialogTitle>
+                                    <DialogDescription>
+                                        Enter your email and we&apos;ll send you a link to reset your password.
+                                    </DialogDescription>
+                                </DialogHeader>
+                                <form onSubmit={handleForgotPassword} className="space-y-4 pt-4">
+                                    <div className="space-y-2">
+                                        <Label>Email</Label>
+                                        <Input
+                                            type="email"
+                                            placeholder="your@email.com"
+                                            value={forgotPasswordEmail}
+                                            onChange={(e) => setForgotPasswordEmail(e.target.value)}
+                                            className="h-12"
+                                        />
+                                    </div>
+                                    <DialogFooter>
+                                        <Button type="button" variant="outline" onClick={() => setForgotPasswordOpen(false)}>
+                                            Cancel
+                                        </Button>
+                                        <Button type="submit" disabled={isProcessing}>
+                                            {isProcessing ? "Sending..." : "Send Reset Link"}
+                                        </Button>
+                                    </DialogFooter>
+                                </form>
+                            </DialogContent>
+                        </Dialog>
                     </div>
                 ) : (
                     <div className="flex flex-col md:flex-row gap-8">

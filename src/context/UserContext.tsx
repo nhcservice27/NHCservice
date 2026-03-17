@@ -26,11 +26,29 @@ interface Customer {
     averageCycleLength?: number;
 }
 
+interface LoginResult {
+    success: boolean;
+    needsPasswordSetup?: boolean;
+    identity?: string;
+    customer?: Customer;
+}
+
+interface RegisterData {
+    email: string;
+    name: string;
+    phone: string;
+    age: number;
+    gender?: string;
+    password: string;
+}
+
 interface UserContextType {
     customer: Customer | null;
     isLoggedIn: boolean;
     loading: boolean;
-    login: (identity: string) => Promise<void>;
+    login: (identity: string, password: string) => Promise<LoginResult>;
+    register: (data: RegisterData) => Promise<{ success: boolean }>;
+    setPassword: (identity: string, password: string) => Promise<{ success: boolean }>;
     logout: () => void;
     updateCustomerData: (data: Partial<Customer>) => void;
 }
@@ -42,59 +60,35 @@ export const UserProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     const [isLoggedIn, setIsLoggedIn] = useState(false);
     const [loading, setLoading] = useState(false);
 
-    useEffect(() => {
-        const savedIdentity = localStorage.getItem("cycle_harmony_user_identity");
-        if (savedIdentity) {
-            handleAutoLogin(savedIdentity);
-        }
-    }, []);
-
-    const handleAutoLogin = async (identity: string) => {
+    const login = async (identity: string, password: string): Promise<LoginResult> => {
         setLoading(true);
         try {
-            const isEmail = identity.includes("@");
-            const url = isEmail
-                ? `/api/customer-profile-by-email/${encodeURIComponent(identity)}`
-                : `/api/customer-profile/${identity}`;
-
-            const response = await fetch(url);
+            const apiBase = import.meta.env.VITE_API_URL || "/api";
+            const response = await fetch(`${apiBase}/customer-login`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ identity: identity.trim(), password }),
+            });
             const data = await response.json();
 
             if (data.success) {
                 setCustomer(data.customer);
                 setIsLoggedIn(true);
-            } else {
-                localStorage.removeItem("cycle_harmony_user_identity");
-            }
-        } catch (error) {
-            console.error("Auto-login error:", error);
-        } finally {
-            setLoading(false);
-        }
-    };
-
-    const login = async (identity: string) => {
-        setLoading(true);
-        try {
-            const isEmail = identity.includes("@");
-            const url = isEmail
-                ? `/api/customer-profile-by-email/${encodeURIComponent(identity)}`
-                : `/api/customer-profile/${identity}`;
-
-            const response = await fetch(url);
-            const data = await response.json();
-
-            if (data.success) {
-                setCustomer(data.customer);
-                setIsLoggedIn(true);
-                localStorage.setItem("cycle_harmony_user_identity", identity);
+                localStorage.setItem("cycle_harmony_user_identity", identity.trim());
                 toast.success(`Welcome back, ${data.customer.name}!`);
-            } else {
-                toast.error("Customer not found");
+                return { success: true, customer: data.customer };
             }
+
+            if (data.needsPasswordSetup) {
+                return { success: false, needsPasswordSetup: true, identity: data.identity };
+            }
+
+            toast.error(data.message || "Invalid email, phone, or password");
+            return { success: false };
         } catch (error) {
             console.error("Login error:", error);
             toast.error("Failed to login");
+            return { success: false };
         } finally {
             setLoading(false);
         }
@@ -107,6 +101,64 @@ export const UserProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         toast.info("Logged out successfully");
     };
 
+    const register = async (data: RegisterData): Promise<{ success: boolean }> => {
+        setLoading(true);
+        try {
+            const apiBase = import.meta.env.VITE_API_URL || "/api";
+            const response = await fetch(`${apiBase}/customers/register`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify(data),
+            });
+            const res = await response.json();
+
+            if (res.success) {
+                setCustomer(res.customer);
+                setIsLoggedIn(true);
+                localStorage.setItem("cycle_harmony_user_identity", data.email.trim());
+                toast.success(`Welcome, ${res.customer.name}! Your account has been created.`);
+                return { success: true };
+            }
+            toast.error(res.message || "Registration failed");
+            return { success: false };
+        } catch (error) {
+            console.error("Register error:", error);
+            toast.error("Failed to create account");
+            return { success: false };
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const setPassword = async (identity: string, password: string): Promise<{ success: boolean }> => {
+        setLoading(true);
+        try {
+            const apiBase = import.meta.env.VITE_API_URL || "/api";
+            const response = await fetch(`${apiBase}/customer-set-password`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ identity: identity.trim(), password }),
+            });
+            const data = await response.json();
+
+            if (data.success) {
+                setCustomer(data.customer);
+                setIsLoggedIn(true);
+                localStorage.setItem("cycle_harmony_user_identity", identity.trim());
+                toast.success("Password set! Welcome to your profile.");
+                return { success: true };
+            }
+            toast.error(data.message || "Failed to set password");
+            return { success: false };
+        } catch (error) {
+            console.error("Set password error:", error);
+            toast.error("Failed to set password");
+            return { success: false };
+        } finally {
+            setLoading(false);
+        }
+    };
+
     const updateCustomerData = (data: Partial<Customer>) => {
         if (customer) {
             setCustomer({ ...customer, ...data });
@@ -114,7 +166,7 @@ export const UserProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     };
 
     return (
-        <UserContext.Provider value={{ customer, isLoggedIn, loading, login, logout, updateCustomerData }}>
+        <UserContext.Provider value={{ customer, isLoggedIn, loading, login, register, logout, setPassword, updateCustomerData }}>
             {children}
         </UserContext.Provider>
     );
