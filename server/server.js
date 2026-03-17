@@ -27,6 +27,7 @@ import { startTelegramListener } from './utils/telegramListener.js';
 
 // Initialize Express app
 const app = express();
+app.set('trust proxy', 1);
 
 // Connect to MongoDB
 connectDB();

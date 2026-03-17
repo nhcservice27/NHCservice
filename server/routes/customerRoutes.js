@@ -19,6 +19,13 @@ const getFrontendBaseUrl = () => {
     return [...(process.env.ALLOWED_ORIGINS || '').split(',')].map(o => o.trim()).find(o => o.startsWith('https://') && !o.includes('localhost')) || 'https://cycle-harmony.netlify.app';
 };
 
+const getSessionCookieOptions = () => ({
+    httpOnly: true,
+    secure: process.env.NODE_ENV === 'production',
+    sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax',
+    path: '/',
+});
+
 const buildCustomerToken = (customer) => {
     if (!process.env.JWT_SECRET) {
         throw new Error('JWT_SECRET is not defined');
@@ -35,9 +42,7 @@ const setCustomerCookie = (res, customer) => {
     const token = buildCustomerToken(customer);
 
     res.cookie('customerToken', token, {
-        httpOnly: true,
-        secure: process.env.NODE_ENV === 'production',
-        sameSite: 'strict',
+        ...getSessionCookieOptions(),
         maxAge: 7 * 24 * 60 * 60 * 1000
     });
 };
@@ -465,11 +470,7 @@ router.post('/customer-reset-password', async (req, res) => {
 });
 
 router.post('/customer-logout', (req, res) => {
-    res.clearCookie('customerToken', {
-        httpOnly: true,
-        secure: process.env.NODE_ENV === 'production',
-        sameSite: 'strict'
-    });
+    res.clearCookie('customerToken', getSessionCookieOptions());
 
     res.status(200).json({
         success: true,

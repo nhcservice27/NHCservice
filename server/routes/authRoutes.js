@@ -4,6 +4,12 @@ import User from '../models/User.js';
 import { validateAuthParams } from '../middleware/validation.js';
 
 const router = express.Router();
+const getSessionCookieOptions = () => ({
+    httpOnly: true,
+    secure: process.env.NODE_ENV === 'production',
+    sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax',
+    path: '/',
+});
 
 // POST /api/auth/login
 router.post('/auth/login', validateAuthParams, async (req, res) => {
@@ -50,9 +56,7 @@ router.post('/auth/login', validateAuthParams, async (req, res) => {
 
         // Set HTTP-only cookie
         res.cookie('token', token, {
-            httpOnly: true,
-            secure: process.env.NODE_ENV === 'production',
-            sameSite: 'strict',
+            ...getSessionCookieOptions(),
             maxAge: 7 * 24 * 60 * 60 * 1000 // 7 days
         });
 
@@ -79,9 +83,7 @@ router.post('/auth/login', validateAuthParams, async (req, res) => {
 // POST /api/auth/logout
 router.post('/auth/logout', (req, res) => {
     res.cookie('token', '', {
-        httpOnly: true,
-        secure: process.env.NODE_ENV === 'production',
-        sameSite: 'strict',
+        ...getSessionCookieOptions(),
         expires: new Date(0)
     });
     res.status(200).json({ success: true, message: 'Logged out successfully' });
