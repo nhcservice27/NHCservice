@@ -2,7 +2,7 @@ import cycleInfographic from "@/assets/cycle_infographic.png";
 
 export function WhatIsSeedCycling() {
   return (
-    <section id="about" className="py-20">
+    <section className="py-20">
       <div className="container mx-auto px-4 max-w-7xl">
         <div className="text-center mb-16">
           <h2 className="font-heading text-4xl md:text-5xl font-bold text-foreground mb-6">
