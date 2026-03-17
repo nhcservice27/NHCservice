@@ -45,6 +45,8 @@ const setCustomerCookie = (res, customer) => {
         ...getSessionCookieOptions(),
         maxAge: 7 * 24 * 60 * 60 * 1000
     });
+
+    return token;
 };
 
 // Check if customer exists by phone
@@ -153,7 +155,7 @@ router.post('/customers/register', async (req, res) => {
 
         const customerData = customer.toObject();
         delete customerData.password;
-        setCustomerCookie(res, customer);
+        const token = setCustomerCookie(res, customer);
 
         try {
             const telegramMsg = `
@@ -174,7 +176,8 @@ router.post('/customers/register', async (req, res) => {
         res.status(201).json({
             success: true,
             message: 'Account created successfully',
-            customer: customerData
+            customer: customerData,
+            token
         });
     } catch (error) {
         console.error('Error registering customer:', error);
@@ -306,12 +309,13 @@ router.post('/customer-login', async (req, res) => {
             isEmail ? { email: identity.trim() } : { phone: identity.trim() }
         ).sort({ createdAt: -1 });
 
-        setCustomerCookie(res, customer);
+        const token = setCustomerCookie(res, customer);
 
         res.status(200).json({
             success: true,
             customer: customerData,
-            orders
+            orders,
+            token
         });
     } catch (error) {
         console.error('Error during customer login:', error);
@@ -353,13 +357,14 @@ router.post('/customer-set-password', async (req, res) => {
             isEmail ? { email: identity.trim() } : { phone: identity.trim() }
         ).sort({ createdAt: -1 });
 
-        setCustomerCookie(res, customer);
+        const token = setCustomerCookie(res, customer);
 
         res.status(200).json({
             success: true,
             message: 'Password set successfully',
             customer: customerData,
-            orders
+            orders,
+            token
         });
     } catch (error) {
         console.error('Error setting customer password:', error);

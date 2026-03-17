@@ -4,6 +4,7 @@ import { Button } from "@/components/Button";
 import { useUser } from "@/context/UserContext";
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || '/api';
+const CUSTOMER_TOKEN_KEY = "cycle_harmony_customer_token";
 
 interface Message {
   role: "user" | "assistant";
@@ -43,9 +44,13 @@ export function ChatBotWidget() {
     setIsLoading(true);
 
     try {
+      const token = localStorage.getItem(CUSTOMER_TOKEN_KEY);
       const res = await fetch(`${API_BASE_URL}/chatbot/chat`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
         credentials: "include",
         body: JSON.stringify({
           message: userMessage,

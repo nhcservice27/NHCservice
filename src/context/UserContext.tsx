@@ -54,6 +54,12 @@ interface UserContextType {
 }
 
 const UserContext = createContext<UserContextType | undefined>(undefined);
+const CUSTOMER_TOKEN_KEY = "cycle_harmony_customer_token";
+
+const getCustomerAuthHeaders = (): HeadersInit => {
+    const token = localStorage.getItem(CUSTOMER_TOKEN_KEY);
+    return token ? { Authorization: `Bearer ${token}` } : {};
+};
 
 export const UserProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
     const [customer, setCustomer] = useState<Customer | null>(null);
@@ -66,6 +72,7 @@ export const UserProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
                 const apiBase = import.meta.env.VITE_API_URL || "/api";
                 const response = await fetch(`${apiBase}/customer-session`, {
                     credentials: "include",
+                    headers: getCustomerAuthHeaders(),
                 });
 
                 if (!response.ok) {
@@ -82,6 +89,9 @@ export const UserProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
                         localStorage.setItem("cycle_harmony_user_identity", data.customer.email);
                     } else if (data.customer.phone) {
                         localStorage.setItem("cycle_harmony_user_identity", data.customer.phone);
+                    }
+                    if (data.token) {
+                        localStorage.setItem(CUSTOMER_TOKEN_KEY, data.token);
                     }
                 }
             } catch (error) {
@@ -110,6 +120,9 @@ export const UserProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
                 setCustomer(data.customer);
                 setIsLoggedIn(true);
                 localStorage.setItem("cycle_harmony_user_identity", identity.trim());
+                if (data.token) {
+                    localStorage.setItem(CUSTOMER_TOKEN_KEY, data.token);
+                }
                 toast.success(`Welcome back, ${data.customer.name}!`);
                 return { success: true, customer: data.customer };
             }
@@ -136,6 +149,7 @@ export const UserProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
             await fetch(`${apiBase}/customer-logout`, {
                 method: "POST",
                 credentials: "include",
+                headers: getCustomerAuthHeaders(),
             });
         } catch (error) {
             console.error("Logout error:", error);
@@ -143,6 +157,7 @@ export const UserProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
             setCustomer(null);
             setIsLoggedIn(false);
             localStorage.removeItem("cycle_harmony_user_identity");
+            localStorage.removeItem(CUSTOMER_TOKEN_KEY);
             toast.info("Logged out successfully");
         }
     };
@@ -163,6 +178,9 @@ export const UserProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
                 setCustomer(res.customer);
                 setIsLoggedIn(true);
                 localStorage.setItem("cycle_harmony_user_identity", data.email.trim());
+                if (res.token) {
+                    localStorage.setItem(CUSTOMER_TOKEN_KEY, res.token);
+                }
                 toast.success(`Welcome, ${res.customer.name}! Your account has been created.`);
                 return { success: true };
             }
@@ -193,6 +211,9 @@ export const UserProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
                 setCustomer(data.customer);
                 setIsLoggedIn(true);
                 localStorage.setItem("cycle_harmony_user_identity", identity.trim());
+                if (data.token) {
+                    localStorage.setItem(CUSTOMER_TOKEN_KEY, data.token);
+                }
                 toast.success("Password set! Welcome to your profile.");
                 return { success: true };
             }

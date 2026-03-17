@@ -51,7 +51,10 @@ const authorizeRole = (...roles) => {
 };
 
 const protectCustomer = (req, res, next) => {
-    const token = req.cookies?.customerToken;
+    const token = req.cookies?.customerToken
+        || (req.headers.authorization && req.headers.authorization.startsWith('Bearer ')
+            ? req.headers.authorization.split(' ')[1]
+            : null);
 
     if (!token) {
         return res.status(401).json({
@@ -72,7 +75,10 @@ const protectCustomer = (req, res, next) => {
 };
 
 const attachOptionalCustomer = (req, res, next) => {
-    const token = req.cookies?.customerToken;
+    const token = req.cookies?.customerToken
+        || (req.headers.authorization && req.headers.authorization.startsWith('Bearer ')
+            ? req.headers.authorization.split(' ')[1]
+            : null);
 
     if (!token) {
         req.customerAuth = null;
