@@ -93,6 +93,9 @@ export const UserProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
                     if (data.token) {
                         localStorage.setItem(CUSTOMER_TOKEN_KEY, data.token);
                     }
+                } else {
+                    setCustomer(null);
+                    setIsLoggedIn(false);
                 }
             } catch (error) {
                 console.error("Restore session error:", error);

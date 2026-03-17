@@ -3,7 +3,7 @@ import crypto from 'crypto';
 import jwt from 'jsonwebtoken';
 import Customer from '../models/Customer.js';
 import Order from '../models/Order.js';
-import { protectCustomer } from '../middleware/auth.js';
+import { attachOptionalCustomer, protectCustomer } from '../middleware/auth.js';
 import { generateCustomerId, generateOrderId } from '../utils/idGenerator.js';
 import { sendTelegramMessage } from '../utils/telegram.js';
 import { sendEmail } from '../utils/email.js';
@@ -483,8 +483,15 @@ router.post('/customer-logout', (req, res) => {
     });
 });
 
-router.get('/customer-session', protectCustomer, async (req, res) => {
+router.get('/customer-session', attachOptionalCustomer, async (req, res) => {
     try {
+        if (!req.customerAuth?.customerId) {
+            return res.status(200).json({
+                success: false,
+                message: 'No active customer session'
+            });
+        }
+
         const customer = await Customer.findById(req.customerAuth.customerId);
 
         if (!customer) {
