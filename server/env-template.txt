@@ -6,8 +6,9 @@ MONGODB_URI=mongodb://localhost:27017/cycle-harmony
 # Server Port
 PORT=5000
 
-# Allowed Origins for CORS (frontend URL)
-ALLOWED_ORIGINS=http://localhost:8080,http://localhost:5173
+# Allowed Origins for CORS - add ALL frontend URLs (comma-separated, no spaces)
+# Include your live domain e.g. https://nhcservice.in
+ALLOWED_ORIGINS=http://localhost:8080,http://localhost:5173,https://nhcservice.in,https://www.nhcservice.in
 
 # Frontend base URL for password reset links (e.g. https://your-app.cloudfront.net or your AWS domain)
 # Required for forgot-password emails to work correctly

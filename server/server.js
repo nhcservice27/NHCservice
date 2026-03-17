@@ -35,7 +35,11 @@ const allowedOrigins = process.env.ALLOWED_ORIGINS?.split(',') || [
   'http://localhost:8081',
   'https://remarkable-tarsier-af2904.netlify.app',
   'https://cycle-harmony-v2.netlify.app',
-  'https://nhcservice.online'
+  'https://nhcservice.online',
+  'https://nhcservice.in',
+  'https://www.nhcservice.in',
+  'http://nhcservice.in',
+  'http://www.nhcservice.in'
 ];
 app.use(cors({
   origin: function (origin, callback) {

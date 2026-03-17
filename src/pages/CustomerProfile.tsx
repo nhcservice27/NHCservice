@@ -109,13 +109,17 @@ export default function CustomerProfile() {
                 body: JSON.stringify({ email: email.trim() }),
             });
             const data = await response.json();
+            if (!response.ok) {
+                throw new Error(data.message || `Server error: ${response.status}`);
+            }
             if (data.exists) {
                 setAuthStep("login");
             } else {
                 setAuthStep("register");
             }
         } catch (err) {
-            toast.error("Could not verify email");
+            console.error("Check email error:", err);
+            toast.error("Could not verify email. Please check your connection and try again.");
         } finally {
             setIsProcessing(false);
         }
