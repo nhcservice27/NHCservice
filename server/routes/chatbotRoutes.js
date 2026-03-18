@@ -7,7 +7,7 @@ import Order from '../models/Order.js';
 import KnowledgeChunk from '../models/KnowledgeChunk.js';
 import ChatbotSettings, { DEFAULT_ALLOWED_CUSTOMER_FIELDS } from '../models/ChatbotSettings.js';
 import { protect, authorizeRole, attachOptionalCustomer } from '../middleware/auth.js';
-import { retrieve, generateResponse, addChunk, queryNeedsLogin } from '../utils/ragAgent.js';
+import { retrieve, generateResponse, addChunk, queryNeedsLogin, personalizeStructuredResponse } from '../utils/ragAgent.js';
 
 const router = express.Router();
 const CUSTOMER_FIELD_OPTIONS = [
@@ -322,7 +322,7 @@ router.post('/chatbot/chat', chatLimiter, attachOptionalCustomer, async (req, re
             'Place an order first, then ask me about its status or details.'
           );
         } else {
-          responseContent = await generateResponse(userContent, chunks, customerContext, isLoggedIn);
+          responseContent = await generateResponse(userContent, chunks, customerContext, customerName, isLoggedIn);
         }
       } else {
         responseContent = !isLoggedIn && queryNeedsLogin(userContent)
@@ -349,6 +349,8 @@ router.post('/chatbot/chat', chatLimiter, attachOptionalCustomer, async (req, re
         )
         : getFallbackResponse(userContent);
     }
+
+    responseContent = personalizeStructuredResponse(responseContent, customerName, isLoggedIn);
 
     // Save assistant response to database (customer chat data persistence)
     await ChatMessage.create({

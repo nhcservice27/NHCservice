@@ -43,13 +43,17 @@ export function ChatBotWidget() {
     sessionStorage.setItem("chatbot_session_id", sessionId || "");
   }, [sessionId]);
 
-  const scrollToBottom = () => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  };
-
   useEffect(() => {
-    scrollToBottom();
-  }, [messages]);
+    if (!isOpen) {
+      return;
+    }
+
+    const frameId = window.requestAnimationFrame(() => {
+      messagesEndRef.current?.scrollIntoView({ block: "end" });
+    });
+
+    return () => window.cancelAnimationFrame(frameId);
+  }, [messages, isOpen]);
 
   const sendChatRequest = async (userMessage: string, sessionId?: string) => {
     const token = localStorage.getItem(CUSTOMER_TOKEN_KEY);

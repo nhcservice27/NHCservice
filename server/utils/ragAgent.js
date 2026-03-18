@@ -117,11 +117,46 @@ function ensureStructuredResponse(text) {
   ].join('\n');
 }
 
+function getCustomerFirstName(customerName) {
+  const value = String(customerName || '').trim();
+  if (!value) {
+    return '';
+  }
+
+  return value.split(/\s+/)[0] || '';
+}
+
+export function personalizeStructuredResponse(text, customerName = '', isLoggedIn = false) {
+  const structuredText = ensureStructuredResponse(text);
+  const firstName = getCustomerFirstName(customerName);
+
+  if (!isLoggedIn || !firstName) {
+    return structuredText;
+  }
+
+  const lines = structuredText.split('\n');
+  const summaryIndex = lines.findIndex((line) => line.startsWith('Summary:'));
+
+  if (summaryIndex === -1) {
+    return structuredText;
+  }
+
+  const summaryText = lines[summaryIndex].replace(/^Summary:\s*/, '').trim();
+  const namePattern = new RegExp(`\\b${firstName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`, 'i');
+
+  if (!summaryText || namePattern.test(summaryText)) {
+    return structuredText;
+  }
+
+  lines[summaryIndex] = `Summary: Hi ${firstName}, ${summaryText}`;
+  return lines.join('\n');
+}
+
 export function queryNeedsLogin(query) {
   return PERSONAL_QUERY_PATTERN.test(query);
 }
 
-export async function generateResponse(query, chunks, customerContext = null, isLoggedIn = false) {
+export async function generateResponse(query, chunks, customerContext = null, customerName = '', isLoggedIn = false) {
   const client = getAI();
   const contextText = chunks.length > 0
     ? chunks.map((c) => c.text).join('\n\n')
@@ -149,6 +184,7 @@ Rules:
 - Only use customer data that is provided in the customer data block.
 - If the user is asking for personal information and the customer data block is empty, follow the access guidance below.
 - Keep responses concise, friendly, and focused on seed cycling, the products, and the user's available data.
+- When the user is logged in and a customer name is available, address them naturally by name.
 - Always use this exact response format:
   Summary: one short sentence
 
@@ -171,8 +207,10 @@ ${accessGuidance}`;
   });
 
   const text = response?.text;
-  return ensureStructuredResponse(
+  return personalizeStructuredResponse(
     (typeof text === 'string' ? text : text?.trim?.()) || "I'm sorry, I couldn't generate a response. Please try again or contact support."
+    , customerName,
+    isLoggedIn
   );
 }
 
