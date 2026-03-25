@@ -1,5 +1,6 @@
 import express from 'express';
 import mongoose from 'mongoose';
+import jwt from 'jsonwebtoken';
 import Customer from '../models/Customer.js';
 import Order from '../models/Order.js';
 import Product from '../models/Product.js';
@@ -15,6 +16,40 @@ import { protect, authorizeRole } from '../middleware/auth.js';
 import { validateOrderParams } from '../middleware/validation.js';
 
 const router = express.Router();
+
+const getSessionCookieOptions = () => ({
+  httpOnly: true,
+  secure: process.env.NODE_ENV === 'production',
+  sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax',
+  path: '/',
+});
+
+const buildCustomerToken = (customer) => {
+  if (!process.env.JWT_SECRET) {
+    throw new Error('JWT_SECRET is not defined');
+  }
+
+  return jwt.sign({
+    customerId: customer._id,
+    customerCode: customer.customerId,
+    email: customer.email || null,
+    phone: customer.phone || null,
+  }, process.env.JWT_SECRET, { expiresIn: '7d' });
+};
+
+const setCustomerCookie = (res, customer) => {
+  const token = buildCustomerToken(customer);
+
+  res.cookie('customerToken', token, {
+    ...getSessionCookieOptions(),
+    maxAge: 7 * 24 * 60 * 60 * 1000,
+  });
+
+  return token;
+};
+
+const normalizeEmail = (value = '') => value.trim().toLowerCase();
+const normalizePhone = (value = '') => value.trim();
 
 // Get Revenue Chart Data
 router.get('/orders/revenue-chart', protect, authorizeRole('admin'), async (req, res) => {
@@ -360,8 +395,14 @@ router.post('/orders', validateOrderParams, async (req, res) => {
       shippingDate,
       autoPhase2,
       phase1Qty,
-      phase2Qty
+      phase2Qty,
+      password, // Accept password from frontend
+      razorpayPaymentId,
+      razorpayOrderId,
+      razorpaySignature
     } = req.body;
+    const normalizedEmail = email ? normalizeEmail(email) : '';
+    const normalizedPhone = normalizePhone(phone);
 
     // --- DYNAMIC PRICING CONFIG ---
     const RATE_P1 = parseFloat(process.env.VITE_PRICE_PER_LADDU_PHASE1 || 33.27);
@@ -369,7 +410,7 @@ router.post('/orders', validateOrderParams, async (req, res) => {
     const DISCOUNT_COMPLETE = parseFloat(process.env.VITE_COMPLETE_PLAN_DISCOUNT || 0.9);
 
     // Validate required fields
-    if (!fullName || !phone || !periodsStarted || !cycleLength || !phase ||
+    if (!fullName || !normalizedPhone || !periodsStarted || !cycleLength || !phase ||
       !totalQuantity || !totalWeight || !totalPrice || !address) {
       return res.status(400).json({
         success: false,
@@ -420,12 +461,12 @@ router.post('/orders', validateOrderParams, async (req, res) => {
 
     // Link Customer & Generate IDs
     let customer;
-    if (email) {
-      customer = await mongoose.model('Customer').findOne({ email });
+    if (normalizedEmail) {
+      customer = await mongoose.model('Customer').findOne({ email: normalizedEmail }).select('+password');
     }
 
-    if (!customer && phone) {
-      customer = await mongoose.model('Customer').findOne({ phone });
+    if (!customer && normalizedPhone) {
+      customer = await mongoose.model('Customer').findOne({ phone: normalizedPhone }).select('+password');
     }
 
     let currentCustomerId;
@@ -442,6 +483,11 @@ router.post('/orders', validateOrderParams, async (req, res) => {
       // Update existing customer details
       customer.name = fullName;
       if (age) customer.age = age;
+      
+      // Save password if it's a legacy customer (no password set)
+      if (!customer.password && password) {
+          customer.password = password;
+      }
 
       // Add address if new (deduplication)
       const isDuplicate = customer.addresses.some(addr =>
@@ -460,19 +506,20 @@ router.post('/orders', validateOrderParams, async (req, res) => {
 
       customer = new mongoose.model('Customer')({
         customerId: newCustomerId,
-        phone,
+        phone: normalizedPhone,
         name: fullName,
         age: age || 0,
         addresses: (!isRequestOnly && finalAddress.house) ? [finalAddress] : [],
         orders: [], // Will push later
-        email: email || undefined
+        email: normalizedEmail || undefined,
+        password: password || undefined // Set password if provided
       });
       await customer.save();
     }
 
     // Update customer email if not set
-    if (customer && !customer.email && email) {
-      customer.email = email;
+    if (customer && !customer.email && normalizedEmail) {
+      customer.email = normalizedEmail;
       await customer.save();
     }
 
@@ -521,7 +568,7 @@ router.post('/orders', validateOrderParams, async (req, res) => {
         const order1 = new Order({
           customerId: currentCustomerId,
           orderId: orderId1,
-          fullName, phone, email, age,
+          fullName, phone: normalizedPhone, email: normalizedEmail || undefined, age,
           periodsStarted: new Date(periodsStarted),
           cycleLength,
           phase,
@@ -538,7 +585,10 @@ router.post('/orders', validateOrderParams, async (req, res) => {
           shippingDate: isFirstCycle && shippingDate ? new Date(shippingDate) : undefined,
           nextDeliveryDate: isFirstCycle && nextDeliveryDate ? new Date(nextDeliveryDate) : undefined,
           deliveryDate: new Date(baseDeliveryDate.getTime() + cycleDaysToAdd * 24 * 60 * 60 * 1000),
-          stockWarning: isFirstCycle ? stockWarning : undefined
+          stockWarning: isFirstCycle ? stockWarning : undefined,
+          razorpayPaymentId: isFirstCycle ? razorpayPaymentId : undefined,
+          razorpayOrderId: isFirstCycle ? razorpayOrderId : undefined,
+          razorpaySignature: isFirstCycle ? razorpaySignature : undefined
         });
         const saved1 = await order1.save();
         customer.orders.push(saved1._id);
@@ -553,7 +603,7 @@ router.post('/orders', validateOrderParams, async (req, res) => {
         const order2 = new Order({
           customerId: currentCustomerId,
           orderId: orderId2,
-          fullName, phone, email, age,
+          fullName, phone: normalizedPhone, email: normalizedEmail || undefined, age,
           periodsStarted: new Date(periodsStarted),
           cycleLength,
           phase: nextPhase,
@@ -568,6 +618,9 @@ router.post('/orders', validateOrderParams, async (req, res) => {
           subscriptionStatus: 'active',
           autoPhase2: false,
           deliveryDate: new Date(baseNextDeliveryDate.getTime() + cycleDaysToAdd * 24 * 60 * 60 * 1000),
+          razorpayPaymentId: isFirstCycle ? razorpayPaymentId : undefined,
+          razorpayOrderId: isFirstCycle ? razorpayOrderId : undefined,
+          razorpaySignature: isFirstCycle ? razorpaySignature : undefined
         });
         const saved2 = await order2.save();
         customer.orders.push(saved2._id);
@@ -584,7 +637,7 @@ router.post('/orders', validateOrderParams, async (req, res) => {
         customerId: currentCustomerId,
         orderId: newOrderId,
         fullName,
-        phone,
+        phone: normalizedPhone,
         periodsStarted: new Date(periodsStarted),
         cycleLength,
         phase,
@@ -594,7 +647,7 @@ router.post('/orders', validateOrderParams, async (req, res) => {
         address: finalAddress,
         paymentMethod: paymentMethod || 'Cash on Delivery',
         message: message || '',
-        email: email || '',
+        email: normalizedEmail || '',
         orderStatus: req.body.orderStatus || 'Pending',
         planType: planType || 'starter',
         subscriptionStatus: planType === 'complete' ? 'active' : 'completed',
@@ -602,7 +655,10 @@ router.post('/orders', validateOrderParams, async (req, res) => {
         nextDeliveryDate: nextDeliveryDate ? new Date(nextDeliveryDate) : undefined,
         shippingDate: shippingDate ? new Date(shippingDate) : undefined,
         deliveryDate: new Date(Date.now() + 24 * 60 * 60 * 1000), // Default expected tomorrow
-        stockWarning: stockWarning || undefined
+        stockWarning: stockWarning || undefined,
+        razorpayPaymentId: razorpayPaymentId || undefined,
+        razorpayOrderId: razorpayOrderId || undefined,
+        razorpaySignature: razorpaySignature || undefined
       });
 
       // Save to database
@@ -707,10 +763,16 @@ ${stockWarning ? `⚠️ *STOCK WARNING:* ${stockWarning}` : ''}
     }
     // --- END PHASE 1 ---
 
+    const token = setCustomerCookie(res, customer);
+    const customerData = customer.toObject();
+    delete customerData.password;
+
     res.status(201).json({
       success: true,
       message: isCompletePlan ? 'Subscription plan active! Two orders generated.' : 'Order created successfully',
-      data: savedOrder
+      data: savedOrder,
+      customer: customerData,
+      token
     });
 
   } catch (error) {

@@ -173,7 +173,7 @@ const Checkout = () => {
             handler: async function (response: any) {
                 console.log("Payment Success:", response);
                 toast.success("Payment Received!");
-                await submitFinalOrder("Online (Razorpay)");
+                await submitFinalOrder("Online (Razorpay)", response);
             },
             prefill: {
                 name: name,
@@ -205,17 +205,21 @@ const Checkout = () => {
         }
     };
 
-    const submitFinalOrder = async (finalMethod: string) => {
+    const submitFinalOrder = async (finalMethod: string, razorpayResponse?: any) => {
         setLoading(true);
         try {
             const finalOrder = {
                 ...orderData,
                 email,
+                password, // Send password to backend
                 fullName: name,
                 phone,
                 age,
                 address,
                 paymentMethod: finalMethod,
+                razorpayPaymentId: razorpayResponse?.razorpay_payment_id,
+                razorpayOrderId: razorpayResponse?.razorpay_order_id,
+                razorpaySignature: razorpayResponse?.razorpay_signature,
                 planType: orderData.planType,
                 nextDeliveryDate: orderData.nextDeliveryDate,
                 shippingDate: orderData.shippingDate,
@@ -225,13 +229,17 @@ const Checkout = () => {
             const response = await fetch(`${API_BASE_URL}/orders`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
+                credentials: 'include',
                 body: JSON.stringify(finalOrder)
             });
 
             const data = await response.json();
             if (data.success) {
                 // Persist identity for seamless redirect to profile
-                localStorage.setItem('cycle_harmony_user_identity', phone || email);
+                localStorage.setItem('cycle_harmony_user_identity', (email || phone).trim());
+                if (data.token) {
+                    localStorage.setItem('cycle_harmony_customer_token', data.token);
+                }
                 setConfirmedOrder(data.data);
                 setShowSuccess(true);
             } else {
@@ -303,7 +311,7 @@ const Checkout = () => {
                     <Button
                         onClick={() => {
                             sessionStorage.removeItem('show_success_persistence');
-                            navigate("/profile");
+                            window.location.assign("/profile");
                         }}
                         className="h-14 bg-gray-900 hover:bg-black text-white text-lg font-bold rounded-2xl shadow-xl transition-all hover:scale-[1.02]"
                     >
@@ -456,12 +464,22 @@ const Checkout = () => {
                                         <h4 className="font-semibold text-gray-700 text-sm">Address Details</h4>
                                         <div className="grid gap-4">
                                             <div className="grid gap-2">
-                                                <Label className="text-xs text-gray-500 uppercase">House / Flat No.</Label>
-                                                <Input value={address.house} onChange={e => setAddress({ ...address, house: e.target.value })} />
+                                                <Label className="text-xs text-gray-500 uppercase">House / Flat No. *</Label>
+                                                <Input
+                                                    value={address.house}
+                                                    onChange={e => setAddress({ ...address, house: e.target.value })}
+                                                    placeholder="Flat 203, Sai Residency"
+                                                    required
+                                                />
                                             </div>
                                             <div className="grid gap-2">
-                                                <Label className="text-xs text-gray-500 uppercase">Area / Street</Label>
-                                                <Input value={address.area} onChange={e => setAddress({ ...address, area: e.target.value })} />
+                                                <Label className="text-xs text-gray-500 uppercase">Area / Street *</Label>
+                                                <Input
+                                                    value={address.area}
+                                                    onChange={e => setAddress({ ...address, area: e.target.value })}
+                                                    placeholder="Kukatpally, Road No. 5"
+                                                    required
+                                                />
                                             </div>
                                             <div className="grid gap-2">
                                                 <div className="flex items-center gap-2">
@@ -486,8 +504,15 @@ const Checkout = () => {
                                             </div>
                                             <div className="grid grid-cols-2 gap-4">
                                                 <div className="grid gap-2">
-                                                    <Label className="text-xs text-gray-500 uppercase">Pincode</Label>
-                                                    <Input value={address.pincode} onChange={e => setAddress({ ...address, pincode: e.target.value })} />
+                                                    <Label className="text-xs text-gray-500 uppercase">Pincode *</Label>
+                                                    <Input
+                                                        value={address.pincode}
+                                                        onChange={e => setAddress({ ...address, pincode: e.target.value })}
+                                                        placeholder="500072"
+                                                        inputMode="numeric"
+                                                        maxLength={6}
+                                                        required
+                                                    />
                                                 </div>
                                                 <div className="grid gap-2">
                                                     <Label className="text-xs text-gray-500 uppercase">Type</Label>

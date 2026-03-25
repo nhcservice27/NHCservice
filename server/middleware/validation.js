@@ -15,19 +15,19 @@ export const handleValidationErrors = (req, res, next) => {
 
 export const validateOrderParams = [
     // Sanitize and validate fields
-    body('fullName').optional().trim().escape().notEmpty().withMessage('Full name cannot be empty'),
-    body('phone').optional().trim().escape().notEmpty().withMessage('Phone cannot be empty'),
-    body('message').optional().trim().escape(),
-    body('address.house').optional().trim().escape(),
-    body('address.area').optional().trim().escape(),
-    body('address.pincode').optional().trim().escape(),
-    body('address.landmark').optional().trim().escape(),
-    body('address.label').optional().trim().escape(),
+    body('fullName').optional().trim().notEmpty().withMessage('Full name cannot be empty'),
+    body('phone').optional().trim().notEmpty().withMessage('Phone cannot be empty'),
+    body('message').optional().trim(),
+    body('address.house').optional().trim(),
+    body('address.area').optional().trim(),
+    body('address.pincode').optional().trim(),
+    body('address.landmark').optional().trim(),
+    body('address.label').optional().trim(),
     handleValidationErrors
 ];
 
 export const validateAuthParams = [
-    body('username').trim().escape().notEmpty().withMessage('Username is required'),
-    body('password').trim().escape().notEmpty().withMessage('Password is required'),
+    body('username').trim().notEmpty().withMessage('Username is required'),
+    body('password').trim().notEmpty().withMessage('Password is required'),
     handleValidationErrors
 ];

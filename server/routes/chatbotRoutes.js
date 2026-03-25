@@ -21,6 +21,8 @@ const CUSTOMER_FIELD_OPTIONS = [
 ];
 const ORDER_QUERY_PATTERN = /\b(ord|order|orders|ordres|delivery|shipping|status|track)\b/i;
 const ORDER_LIST_QUERY_PATTERN = /\b(list|show|give|all|recent|latest)\b.*\b(ord|order|orders|ordres)\b|\b(ord|order|orders|ordres)\b.*\b(list|show|give|all|recent|latest)\b/i;
+const GREETING_QUERY_PATTERN = /^(hi|hello|hey|hii|helo|hy|good morning|good afternoon|good evening)\b[!. ]*$/i;
+const THANKS_QUERY_PATTERN = /^(thanks|thank you|thx|ok thanks|okay thanks)\b[!. ]*$/i;
 
 function formatStructuredResponse(summary, details = [], nextStep = 'Ask another question if you want more help.') {
   return [
@@ -151,6 +153,49 @@ function getFallbackResponse(userQuery) {
     ],
     'Ask one of the suggested questions to get started.'
   );
+}
+
+function getQuickResponse(userQuery, isLoggedIn = false) {
+  const normalizedQuery = String(userQuery || '').trim().toLowerCase();
+
+  if (!normalizedQuery) {
+    return null;
+  }
+
+  if (GREETING_QUERY_PATTERN.test(normalizedQuery)) {
+    return formatStructuredResponse(
+      'How can I help you today?',
+      isLoggedIn
+        ? [
+          'I can help with seed cycling, laddus, your orders, and your cycle-related details.',
+          'You can ask about your latest order, delivery status, or general product questions.'
+        ]
+        : [
+          'I can help with seed cycling, laddus, shipping, and product questions.',
+          'Log in if you want personal help with your orders and cycle information.'
+        ],
+      'Ask your question and I will help right away.'
+    );
+  }
+
+  if (THANKS_QUERY_PATTERN.test(normalizedQuery)) {
+    return formatStructuredResponse(
+      'You are welcome.',
+      [
+        'I am here whenever you need help.',
+        'You can ask another question about seed cycling, laddus, or your account.'
+      ],
+      'Send your next question whenever you are ready.'
+    );
+  }
+
+  for (const key of Object.keys(simulatedResponses)) {
+    if (normalizedQuery.includes(key)) {
+      return getFallbackResponse(userQuery);
+    }
+  }
+
+  return null;
 }
 
 async function getChatbotSettings() {
@@ -307,34 +352,38 @@ router.post('/chatbot/chat', chatLimiter, attachOptionalCustomer, async (req, re
     // Generate response: use RAG if available, else fallback to keyword matching
     let responseContent;
     try {
-      if (process.env.GEMINI_API_KEY) {
-        const chunkCount = await KnowledgeChunk.countDocuments();
-        const chunks = chunkCount > 0 ? await retrieve(userContent, 5) : [];
-        if (isLoggedIn && queryIsForOrderList(userContent) && customerOrders.length > 0) {
-          responseContent = formatOrderListResponse(customerName, customerOrders);
-        } else if (isLoggedIn && queryIsAboutOrders(userContent) && customerContext?.orderCount === 0) {
-          responseContent = formatStructuredResponse(
-            'You are logged in, but I could not find any saved orders on your account yet.',
-            [
-              'Your login is working correctly.',
-              'I can only show order details after an order is placed and linked to your profile.'
-            ],
-            'Place an order first, then ask me about its status or details.'
-          );
-        } else {
-          responseContent = await generateResponse(userContent, chunks, customerContext, customerName, isLoggedIn);
-        }
+      if (isLoggedIn && queryIsForOrderList(userContent) && customerOrders.length > 0) {
+        responseContent = formatOrderListResponse(customerName, customerOrders);
+      } else if (isLoggedIn && queryIsAboutOrders(userContent) && customerContext?.orderCount === 0) {
+        responseContent = formatStructuredResponse(
+          'You are logged in, but I could not find any saved orders on your account yet.',
+          [
+            'Your login is working correctly.',
+            'I can only show order details after an order is placed and linked to your profile.'
+          ],
+          'Place an order first, then ask me about its status or details.'
+        );
+      } else if (!isLoggedIn && queryNeedsLogin(userContent)) {
+        responseContent = formatStructuredResponse(
+          'Can you log in first?',
+          [
+            'Then I can understand your order and customer details more easily.',
+            'After login, I can help with your orders, cycle information, and account-related answers.'
+          ],
+          'Log in to your profile, then send your question again.'
+        );
       } else {
-        responseContent = !isLoggedIn && queryNeedsLogin(userContent)
-          ? formatStructuredResponse(
-            'Can you log in first?',
-            [
-              'Then I can understand your order and customer details more easily.',
-              'After login, I can help with your orders, cycle information, and account-related answers.'
-            ],
-            'Log in to your profile, then send your question again.'
-          )
-          : getFallbackResponse(userContent);
+        const quickResponse = getQuickResponse(userContent, isLoggedIn);
+
+        if (quickResponse) {
+          responseContent = quickResponse;
+        } else if (process.env.GEMINI_API_KEY) {
+          const chunkCount = await KnowledgeChunk.countDocuments();
+          const chunks = chunkCount > 0 ? await retrieve(userContent, 3) : [];
+          responseContent = await generateResponse(userContent, chunks, customerContext, customerName, isLoggedIn);
+        } else {
+          responseContent = getFallbackResponse(userContent);
+        }
       }
     } catch (ragError) {
       console.warn('RAG fallback:', ragError?.message);

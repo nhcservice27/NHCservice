@@ -7,7 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import {
     Search, Package, Calendar, Clock, CheckCircle, Truck, XCircle,
     User, MapPin, Settings, LogOut, ChevronRight, ShoppingBag, CreditCard, Send,
-    AlertCircle, ArrowLeft
+    AlertCircle, ArrowLeft, Info
 } from "lucide-react";
 import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
@@ -52,6 +52,7 @@ export default function CustomerProfile() {
     const selectedOrderId = searchParams.get("order");
 
     const [isAddAddressOpen, setIsAddAddressOpen] = useState(false);
+    const [receiptOrder, setReceiptOrder] = useState<any>(null);
     const [newAddress, setNewAddress] = useState({
         house: "",
         area: "",
@@ -303,35 +304,58 @@ export default function CustomerProfile() {
     };
 
     const renderTrackingTimeline = (status: string) => {
-        const stages = ['Pending', 'Confirmed', 'Processing', 'Shipped', 'Delivered'];
-        const currentIndex = stages.indexOf(status);
+        const stages = [
+            { id: 'Pending', label: 'Pending', color: 'bg-yellow-500', lineColor: 'border-yellow-200', icon: Clock },
+            { id: 'Confirmed', label: 'Confirmed', color: 'bg-blue-500', lineColor: 'border-blue-200', icon: CheckCircle },
+            { id: 'Shipped', label: 'Shipped', color: 'bg-indigo-500', lineColor: 'border-indigo-200', icon: Truck },
+            { id: 'Delivered', label: 'Delivered', color: 'bg-green-500', lineColor: 'border-green-200', icon: CheckCircle }
+        ];
+
+        // Map intermediate statuses if needed
+        const currentStatus = status === 'Processing' ? 'Confirmed' : (status === 'Cancelled' ? 'Pending' : status);
+        const currentIndex = stages.findIndex(s => s.id === currentStatus);
 
         return (
-            <div className="py-8 px-4">
-                <div className="relative flex justify-between items-center max-w-2xl mx-auto">
-                    {/* Connecting Line */}
-                    <div className="absolute top-1/2 left-0 w-full h-0.5 bg-gray-100 -translate-y-1/2 -z-10"></div>
-                    <div
-                        className="absolute top-1/2 left-0 h-0.5 bg-pink-500 transition-all duration-1000 -translate-y-1/2 -z-10"
-                        style={{ width: `${Math.max(0, (currentIndex / (stages.length - 1)) * 100)}%` }}
-                    ></div>
-
+            <div className="py-6 px-4">
+                <div className="flex flex-col gap-0 max-w-sm mx-auto">
                     {stages.map((stage, idx) => {
                         const isCompleted = idx <= currentIndex;
                         const isActive = idx === currentIndex;
-                        const Icon = idx === 0 ? Clock : idx === 1 ? CheckCircle : idx === 2 ? Package : idx === 3 ? Truck : CheckCircle;
+                        const isLast = idx === stages.length - 1;
+                        const Icon = stage.icon;
 
                         return (
-                            <div key={stage} className="flex flex-col items-center gap-3 relative">
-                                <div className={`w-10 h-10 rounded-full flex items-center justify-center transition-all duration-500 shadow-sm ${isCompleted ? 'bg-pink-500 text-white' : 'bg-white text-gray-300 border-2 border-gray-100'
-                                    } ${isActive ? 'ring-4 ring-pink-100 scale-110' : ''}`}>
-                                    <Icon className="w-5 h-5" />
-                                </div>
-                                <div className="text-center">
-                                    <p className={`text-[10px] font-bold uppercase tracking-widest ${isCompleted ? 'text-pink-600' : 'text-gray-400'}`}>
-                                        {stage}
-                                    </p>
-                                    {isActive && <Badge className="mt-1 bg-pink-50 text-pink-600 border-none text-[8px] animate-pulse">Current</Badge>}
+                            <div key={stage.id} className="flex flex-col">
+                                <div className="flex items-center gap-6 group">
+                                    <div className="relative flex flex-col items-center">
+                                        {/* Status Dot */}
+                                        <div className={`w-12 h-12 rounded-2xl flex items-center justify-center transition-all duration-500 z-10 shadow-sm ${isCompleted ? `${stage.color} text-white` : 'bg-white text-gray-200 border-2 border-gray-100'
+                                            } ${isActive ? 'ring-4 ring-pink-100 scale-110' : ''}`}>
+                                            <Icon className="w-6 h-6" />
+                                        </div>
+
+                                        {/* Connecting Line (::) */}
+                                        {!isLast && (
+                                            <div className={`w-0.5 h-12 border-l-2 border-dashed my-1 transition-colors duration-500 ${isCompleted ? stage.lineColor : 'border-gray-100'}`}></div>
+                                        )}
+                                    </div>
+
+                                    <div className="flex-1 pb-4">
+                                        <div className="flex flex-col">
+                                            <span className={`text-lg font-black uppercase tracking-tight transition-colors duration-500 ${isCompleted ? 'text-gray-900' : 'text-gray-300'}`}>
+                                                {stage.label}
+                                            </span>
+                                            {isActive && (
+                                                <div className="flex items-center gap-2 mt-1">
+                                                    <div className="w-2 h-2 bg-pink-500 rounded-full animate-ping"></div>
+                                                    <span className="text-[10px] font-bold text-pink-500 uppercase tracking-widest">Active Status</span>
+                                                </div>
+                                            )}
+                                            {!isCompleted && !isActive && (
+                                                <span className="text-[10px] text-gray-400 font-medium">Coming up next</span>
+                                            )}
+                                        </div>
+                                    </div>
                                 </div>
                             </div>
                         );
@@ -759,25 +783,32 @@ export default function CustomerProfile() {
 
                                     {/* Last Order Status Card (NOW FIRST) */}
                                     {orders.length > 0 && (() => {
-                                        const displayOrder = orders.find(o => o.orderStatus === 'Requested') || orders.find(o => ['Confirmed', 'Processing', 'Shipped'].includes(o.orderStatus)) || orders[0];
+                                        const displayOrder = 
+                                            orders.find(o => o.orderStatus === 'Requested') || 
+                                            orders.find(o => ['Confirmed', 'Processing', 'Shipped'].includes(o.orderStatus)) || 
+                                            orders.find(o => ['Pending', 'Not Approved'].includes(o.orderStatus)) || 
+                                            orders[orders.length - 1]; // Fallback to the most recent chronological order if all delivered
                                         return (
                                             <Card className="border-none shadow-xl bg-gradient-to-br from-pink-500 to-purple-600 text-white relative overflow-hidden animate-in fade-in slide-in-from-top-4 duration-500">
-                                                <div className="absolute top-0 right-0 w-64 h-64 bg-white/10 rounded-full -mr-20 -mt-20 blur-3xl"></div>
-                                                <CardHeader className="pb-2">
+                                                <div className="absolute top-0 right-0 w-64 h-64 bg-white/10 rounded-full -mr-20 -mt-20 blur-3xl pointer-events-none"></div>
+                                                <CardHeader className="pb-2 relative z-10">
                                                     <CardTitle className="text-sm font-bold flex items-center gap-2 opacity-90 uppercase tracking-wider">
                                                         <Truck className="w-4 h-4" /> Last Order Status
                                                     </CardTitle>
                                                 </CardHeader>
-                                                <CardContent>
+                                                <CardContent className="relative z-20">
                                                     <div className="flex justify-between items-center mb-4">
                                                         <div>
                                                             <p className="text-4xl font-black mb-1">{displayOrder.orderStatus}</p>
                                                             <p className="text-white/80 text-xs font-bold font-mono">#{displayOrder.orderId || displayOrder._id.slice(-6).toUpperCase()} • {displayOrder.phase}</p>
                                                         </div>
                                                         <Button
-                                                            onClick={() => { setSearchParams({ tab: "orders", order: displayOrder._id }); }}
+                                                            onClick={() => {
+                                                                console.log("Track Order clicked for order:", displayOrder._id);
+                                                                setSearchParams({ tab: "orders", order: displayOrder._id });
+                                                            }}
                                                             variant="secondary"
-                                                            className="bg-white text-pink-600 hover:bg-gray-100 font-bold shadow-lg"
+                                                            className="bg-white text-pink-600 hover:bg-gray-100 font-bold shadow-lg relative z-30"
                                                         >
                                                             Track Order
                                                         </Button>
@@ -878,6 +909,58 @@ export default function CustomerProfile() {
                                             )}
                                         </CardContent>
                                     </Card>
+
+                                    {/* Razorpay Receipt Modal */}
+                                    <Dialog open={!!receiptOrder} onOpenChange={() => setReceiptOrder(null)}>
+                                        <DialogContent className="max-w-sm rounded-[2rem] border-none shadow-2xl overflow-hidden p-0">
+                                            <div className="bg-gradient-to-br from-blue-600 to-indigo-700 p-8 text-white relative overflow-hidden">
+                                                <div className="absolute -top-10 -right-10 w-40 h-40 bg-white/10 rounded-full blur-2xl" />
+                                                <div className="absolute -bottom-10 -left-10 w-40 h-40 bg-black/10 rounded-full blur-2xl" />
+                                                <div className="relative z-10 flex flex-col items-center text-center">
+                                                    <div className="w-16 h-16 bg-white/20 backdrop-blur-md rounded-full flex items-center justify-center mb-4 border border-white/30 shadow-xl">
+                                                        <CheckCircle className="w-8 h-8 text-white" />
+                                                    </div>
+                                                    <h3 className="text-2xl font-black mb-1">Payment Verified</h3>
+                                                    <p className="text-blue-100 text-xs font-medium uppercase tracking-[0.2em]">Transaction Confirmed</p>
+                                                </div>
+                                            </div>
+                                            <div className="p-8 space-y-6 bg-white">
+                                                <div className="space-y-4">
+                                                    <div className="flex justify-between items-center pb-4 border-b border-gray-50">
+                                                        <span className="text-xs font-bold text-gray-400 uppercase tracking-widest">Amount Paid</span>
+                                                        <span className="text-xl font-black text-gray-900">₹{receiptOrder?.totalPrice}</span>
+                                                    </div>
+                                                    <div className="flex justify-between items-center pb-4 border-b border-gray-50">
+                                                        <span className="text-xs font-bold text-gray-400 uppercase tracking-widest">Date</span>
+                                                        <span className="text-sm font-bold text-gray-700">{receiptOrder ? formatDate(receiptOrder.createdAt) : ''}</span>
+                                                    </div>
+                                                    <div className="space-y-1">
+                                                        <span className="text-xs font-bold text-gray-400 uppercase tracking-widest">Transaction ID</span>
+                                                        <div className="bg-gray-50 p-3 rounded-xl border border-gray-100 font-mono text-[10px] text-gray-600 break-all select-all flex items-center justify-between">
+                                                            {receiptOrder?.razorpayPaymentId}
+                                                            <div className="text-[8px] bg-blue-100 text-blue-600 px-1.5 py-0.5 rounded-full font-sans uppercase">Razorpay</div>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                                
+                                                <div className="bg-blue-50/50 p-4 rounded-2xl border border-blue-50 flex items-start gap-3">
+                                                    <div className="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center shrink-0">
+                                                        <Info className="w-4 h-4 text-blue-600" />
+                                                    </div>
+                                                    <p className="text-[10px] text-blue-700 leading-relaxed italic">
+                                                        This receipt confirms that your payment was successfully processed via Razorpay Secure. You can use the Transaction ID for any support queries.
+                                                    </p>
+                                                </div>
+
+                                                <Button 
+                                                    onClick={() => setReceiptOrder(null)}
+                                                    className="w-full h-12 bg-gray-900 hover:bg-black text-white font-bold rounded-xl shadow-xl transition-all"
+                                                >
+                                                    Done
+                                                </Button>
+                                            </div>
+                                        </DialogContent>
+                                    </Dialog>
                                 </div>
                             )}
 
@@ -1014,8 +1097,16 @@ export default function CustomerProfile() {
                                                                 <div>
                                                                     <h4 className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-2">Ship to</h4>
                                                                     <address className="not-italic text-sm text-gray-600 leading-relaxed">
-                                                                        {order.address.house}, {order.address.area}<br />
-                                                                        {order.address.pincode}
+                                                                        {order.orderStatus === 'Not Approved' ? (
+                                                                            <span className="font-bold text-yellow-600 flex items-center gap-1.5 p-1.5 bg-yellow-50 rounded-lg inline-flex mt-1">
+                                                                                <Clock className="w-3 h-3" /> Pending
+                                                                            </span>
+                                                                        ) : (
+                                                                            <>
+                                                                                {order.address?.house}, {order.address?.area}<br />
+                                                                                {order.address?.pincode}
+                                                                            </>
+                                                                        )}
                                                                     </address>
                                                                 </div>
                                                             </div>

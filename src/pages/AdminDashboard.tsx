@@ -85,7 +85,9 @@ export default function AdminDashboard() {
   const [deletingCustomerId, setDeletingCustomerId] = useState<string | null>(null);
   const [editCustomerForm, setEditCustomerForm] = useState({
     name: '',
+    email: '',
     age: '',
+    gender: 'prefer_not_to_say',
     phone: '',
     planType: '',
     subscriptionStatus: '',
@@ -473,7 +475,9 @@ export default function AdminDashboard() {
     setEditingCustomer(customer);
     setEditCustomerForm({
       name: customer.fullName || customer.name || '',
+      email: customer.email || '',
       age: customer.age || '',
+      gender: customer.gender || 'prefer_not_to_say',
       phone: customer.phone || '',
       planType: customer.planType || 'none',
       subscriptionStatus: customer.subscriptionStatus || 'none',
@@ -843,6 +847,28 @@ export default function AdminDashboard() {
             <div className="grid gap-2">
               <Label>Phone Number</Label>
               <Input value={editCustomerForm.phone} onChange={e => setEditCustomerForm({ ...editCustomerForm, phone: e.target.value })} />
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="grid gap-2">
+                <Label>Email</Label>
+                <Input value={editCustomerForm.email} onChange={e => setEditCustomerForm({ ...editCustomerForm, email: e.target.value })} />
+              </div>
+              <div className="grid gap-2">
+                <Label>Age</Label>
+                <Input type="number" value={editCustomerForm.age} onChange={e => setEditCustomerForm({ ...editCustomerForm, age: e.target.value })} />
+              </div>
+            </div>
+            <div className="grid gap-2">
+              <Label>Gender</Label>
+              <Select value={editCustomerForm.gender} onValueChange={v => setEditCustomerForm({ ...editCustomerForm, gender: v })}>
+                <SelectTrigger><SelectValue placeholder="Select Gender" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="male">Male</SelectItem>
+                  <SelectItem value="female">Female</SelectItem>
+                  <SelectItem value="other">Other</SelectItem>
+                  <SelectItem value="prefer_not_to_say">Prefer Not to Say</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
             <div className="grid gap-2">
               <Label>Plan Type</Label>

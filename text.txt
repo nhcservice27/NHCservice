@@ -871,3 +871,6 @@ this is the deployment plan for the project:
 5.git reset --hard origin/main
 3.pm2 start server.js --name nhc-backend
 6.~/NHCservice/server$ pm2 start server.js --name nhc-backend
+//////////////////////////////////////////////////////////////////////////////////////////////
+  In fuacture doc
+  1.in the chatbot of order list shoing the more to control limin

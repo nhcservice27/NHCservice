@@ -167,20 +167,53 @@ export function Customers({ customers, orders, handleEditCustomerClick, handleDe
                     {selectedCustomer && (
                         <div className="space-y-8">
                             {/* Profile Header */}
-                            <div className="flex items-center gap-6">
-                                <Avatar className="h-20 w-20 border-4 border-white shadow-md">
+                            <div className="flex items-start gap-6">
+                                <Avatar className="h-20 w-20 border-4 border-white shadow-md mt-1">
                                     <AvatarFallback className="bg-gradient-to-br from-pink-500 to-purple-600 text-white text-2xl">
                                         {selectedCustomer.fullName?.charAt(0) || 'C'}
                                     </AvatarFallback>
                                 </Avatar>
-                                <div>
-                                    <h2 className="text-2xl font-bold text-gray-900">{selectedCustomer.fullName || 'Unknown'}</h2>
-                                    <div className="flex items-center gap-4 text-gray-500 mt-1">
-                                        <span className="flex items-center gap-1 text-sm"><Phone className="w-3.5 h-3.5" /> {selectedCustomer.phone || 'N/A'}</span>
-                                        <span className="text-gray-300">|</span>
-                                        <span className="text-sm font-mono">{selectedCustomer.customerId}</span>
+                                <div className="flex-1">
+                                    <div className="flex justify-between items-start">
+                                        <div>
+                                            <h2 className="text-2xl font-bold text-gray-900">{selectedCustomer.fullName || 'Unknown'}</h2>
+                                            <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-gray-500 mt-1">
+                                                <span className="flex items-center gap-1 text-sm"><Phone className="w-3.5 h-3.5" /> {selectedCustomer.phone || 'N/A'}</span>
+                                                {selectedCustomer.email && (
+                                                    <span className="flex items-center gap-1 text-sm"><ShoppingBag className="w-3.5 h-3.5" /> {selectedCustomer.email}</span>
+                                                )}
+                                                <span className="text-sm font-mono bg-gray-100 px-1.5 py-0.5 rounded text-gray-600">{selectedCustomer.customerId}</span>
+                                            </div>
+                                        </div>
+                                        <div className="text-right">
+                                            <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Customer Since</p>
+                                            <p className="text-sm font-bold text-gray-900">{formatDate(selectedCustomer.createdAt)}</p>
+                                        </div>
                                     </div>
-                                    <div className="flex items-center gap-2 mt-3">
+
+                                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mt-4">
+                                        <div className="bg-gray-50 p-2 rounded-lg border border-gray-100">
+                                            <p className="text-[9px] font-bold text-gray-400 uppercase">Age</p>
+                                            <p className="text-sm font-bold text-gray-700">{selectedCustomer.age || 'N/A'}</p>
+                                        </div>
+                                        <div className="bg-gray-50 p-2 rounded-lg border border-gray-100">
+                                            <p className="text-[9px] font-bold text-gray-400 uppercase">Gender</p>
+                                            <p className="text-sm font-bold text-gray-700 capitalize">{selectedCustomer.gender || 'Not specified'}</p>
+                                        </div>
+                                        <div className="bg-gray-50 p-2 rounded-lg border border-gray-100">
+                                            <p className="text-[9px] font-bold text-gray-400 uppercase">Status</p>
+                                            <div className="flex items-center gap-1 mt-0.5">
+                                                <div className={`h-2 w-2 rounded-full ${selectedCustomer.subscriptionStatus === 'active' ? 'bg-green-500' : 'bg-gray-300'}`}></div>
+                                                <p className="text-xs font-bold text-gray-700 capitalize">{selectedCustomer.subscriptionStatus || 'Inactive'}</p>
+                                            </div>
+                                        </div>
+                                        <div className="bg-gray-50 p-2 rounded-lg border border-gray-100">
+                                            <p className="text-[9px] font-bold text-gray-400 uppercase">Security</p>
+                                            <p className="text-[10px] font-bold text-pink-600 bg-pink-50 px-1 rounded inline-block mt-0.5">Encrypted Pass</p>
+                                        </div>
+                                    </div>
+
+                                    <div className="flex items-center gap-2 mt-4">
                                         <Badge variant="secondary" className="bg-green-100 text-green-700 hover:bg-green-100">
                                             {selectedCustomer.totalOrders || 0} Orders
                                         </Badge>

@@ -26,6 +26,9 @@ const getSessionCookieOptions = () => ({
     path: '/',
 });
 
+const normalizeEmail = (value = '') => value.trim().toLowerCase();
+const normalizePhone = (value = '') => value.trim();
+
 const buildCustomerToken = (customer) => {
     if (!process.env.JWT_SECRET) {
         throw new Error('JWT_SECRET is not defined');
@@ -53,12 +56,13 @@ const setCustomerCookie = (res, customer) => {
 router.post('/check-customer', async (req, res) => {
     try {
         const { phone } = req.body;
+        const normalizedPhone = normalizePhone(phone);
 
-        if (!phone) {
+        if (!normalizedPhone) {
             return res.status(400).json({ success: false, message: 'Phone number is required' });
         }
 
-        const customer = await Customer.findOne({ phone });
+        const customer = await Customer.findOne({ phone: normalizedPhone });
 
         if (customer) {
             return res.status(200).json({
@@ -84,12 +88,13 @@ router.post('/check-customer', async (req, res) => {
 router.post('/check-customer-by-email', async (req, res) => {
     try {
         const { email } = req.body;
+        const normalizedEmail = normalizeEmail(email);
 
-        if (!email) {
+        if (!normalizedEmail) {
             return res.status(400).json({ success: false, message: 'Email is required' });
         }
 
-        const customer = await Customer.findOne({ email });
+        const customer = await Customer.findOne({ email: normalizedEmail });
 
         if (customer) {
             return res.status(200).json({
@@ -115,8 +120,10 @@ router.post('/check-customer-by-email', async (req, res) => {
 router.post('/customers/register', async (req, res) => {
     try {
         const { email, name, phone, age, gender, password } = req.body;
+        const normalizedEmail = normalizeEmail(email);
+        const normalizedPhone = normalizePhone(phone);
 
-        if (!email?.trim() || !name?.trim() || !phone?.trim() || !age || !password) {
+        if (!normalizedEmail || !name?.trim() || !normalizedPhone || !age || !password) {
             return res.status(400).json({
                 success: false,
                 message: 'Email, Name, Phone, Age, and Password are required'
@@ -130,12 +137,12 @@ router.post('/customers/register', async (req, res) => {
             });
         }
 
-        const existingByEmail = await Customer.findOne({ email: email.trim() });
+        const existingByEmail = await Customer.findOne({ email: normalizedEmail });
         if (existingByEmail) {
             return res.status(400).json({ success: false, message: 'An account with this email already exists. Please login instead.' });
         }
 
-        const existingByPhone = await Customer.findOne({ phone: phone.trim() });
+        const existingByPhone = await Customer.findOne({ phone: normalizedPhone });
         if (existingByPhone) {
             return res.status(400).json({ success: false, message: 'An account with this phone number already exists.' });
         }
@@ -143,8 +150,8 @@ router.post('/customers/register', async (req, res) => {
         const newCustomerId = await generateCustomerId();
         const customer = new Customer({
             customerId: newCustomerId,
-            email: email.trim(),
-            phone: phone.trim(),
+            email: normalizedEmail,
+            phone: normalizedPhone,
             name: name.trim(),
             age: Number(age),
             gender: gender || undefined,
@@ -189,12 +196,13 @@ router.post('/customers/register', async (req, res) => {
 router.post('/customers', async (req, res) => {
     try {
         const { phone, name, age } = req.body;
+        const normalizedPhone = normalizePhone(phone);
 
-        if (!phone || !name || !age) {
+        if (!normalizedPhone || !name || !age) {
             return res.status(400).json({ success: false, message: 'Phone, Name, and Age are required' });
         }
 
-        let customer = await Customer.findOne({ phone });
+        let customer = await Customer.findOne({ phone: normalizedPhone });
 
         if (customer) {
             // Update existing
@@ -206,7 +214,7 @@ router.post('/customers', async (req, res) => {
             const newCustomerId = await generateCustomerId();
             customer = new Customer({
                 customerId: newCustomerId,
-                phone,
+                phone: normalizedPhone,
                 name,
                 age,
                 addresses: []
@@ -270,16 +278,17 @@ router.get('/customers', async (req, res) => {
 router.post('/customer-login', async (req, res) => {
     try {
         const { identity, password } = req.body;
+        const normalizedIdentity = String(identity || '').trim();
 
-        if (!identity?.trim()) {
+        if (!normalizedIdentity) {
             return res.status(400).json({ success: false, message: 'Email or phone number is required' });
         }
         if (!password) {
             return res.status(400).json({ success: false, message: 'Password is required' });
         }
 
-        const isEmail = identity.includes('@');
-        const query = isEmail ? { email: identity.trim() } : { phone: identity.trim() };
+        const isEmail = normalizedIdentity.includes('@');
+        const query = isEmail ? { email: normalizeEmail(normalizedIdentity) } : { phone: normalizePhone(normalizedIdentity) };
         const customer = await Customer.findOne(query).select('+password');
 
         if (!customer) {
@@ -292,7 +301,7 @@ router.post('/customer-login', async (req, res) => {
                 success: false,
                 needsPasswordSetup: true,
                 message: 'Please set your password first',
-                identity: identity.trim()
+                identity: normalizedIdentity
             });
         }
 
@@ -306,7 +315,7 @@ router.post('/customer-login', async (req, res) => {
         delete customerData.password;
 
         const orders = await Order.find(
-            isEmail ? { email: identity.trim() } : { phone: identity.trim() }
+            isEmail ? { email: normalizeEmail(normalizedIdentity) } : { phone: normalizePhone(normalizedIdentity) }
         ).sort({ createdAt: -1 });
 
         const token = setCustomerCookie(res, customer);
@@ -327,16 +336,17 @@ router.post('/customer-login', async (req, res) => {
 router.post('/customer-set-password', async (req, res) => {
     try {
         const { identity, password } = req.body;
+        const normalizedIdentity = String(identity || '').trim();
 
-        if (!identity?.trim()) {
+        if (!normalizedIdentity) {
             return res.status(400).json({ success: false, message: 'Email or phone number is required' });
         }
         if (!password || password.length < 6) {
             return res.status(400).json({ success: false, message: 'Password must be at least 6 characters' });
         }
 
-        const isEmail = identity.includes('@');
-        const query = isEmail ? { email: identity.trim() } : { phone: identity.trim() };
+        const isEmail = normalizedIdentity.includes('@');
+        const query = isEmail ? { email: normalizeEmail(normalizedIdentity) } : { phone: normalizePhone(normalizedIdentity) };
         const customer = await Customer.findOne(query).select('+password');
 
         if (!customer) {
@@ -354,7 +364,7 @@ router.post('/customer-set-password', async (req, res) => {
         delete customerData.password;
 
         const orders = await Order.find(
-            isEmail ? { email: identity.trim() } : { phone: identity.trim() }
+            isEmail ? { email: normalizeEmail(normalizedIdentity) } : { phone: normalizePhone(normalizedIdentity) }
         ).sort({ createdAt: -1 });
 
         const token = setCustomerCookie(res, customer);
@@ -376,12 +386,13 @@ router.post('/customer-set-password', async (req, res) => {
 router.post('/customer-forgot-password', async (req, res) => {
     try {
         const { email } = req.body;
+        const normalizedEmail = normalizeEmail(email);
 
-        if (!email?.trim()) {
+        if (!normalizedEmail) {
             return res.status(400).json({ success: false, message: 'Email is required' });
         }
 
-        const customer = await Customer.findOne({ email: email.trim() }).select('+passwordResetToken +passwordResetExpires');
+        const customer = await Customer.findOne({ email: normalizedEmail }).select('+passwordResetToken +passwordResetExpires');
 
         if (!customer) {
             return res.status(200).json({
@@ -586,71 +597,68 @@ router.patch('/customers/:id', async (req, res) => {
             const lastOrder = await Order.findOne({ customerId: customer.customerId }).sort({ createdAt: -1 });
 
             if (lastOrder) {
-                const p1Val = lastOrder.phase === 'Phase-1' ? lastOrder.totalQuantity : 14;
-                const p2Val = lastOrder.phase === 'Phase-2' ? lastOrder.totalQuantity : 14;
-                const price1 = Math.round(lastOrder.totalPrice * (p1Val / (p1Val + p2Val || 1)));
-                const price2 = lastOrder.totalPrice - price1;
-
-                const baseDeliveryDate = lastOrder.deliveryDate ? new Date(lastOrder.deliveryDate) : new Date(Date.now() + 24 * 60 * 60 * 1000);
-                const baseNextDeliveryDate = lastOrder.nextDeliveryDate ? new Date(lastOrder.nextDeliveryDate) : new Date(baseDeliveryDate.getTime() + 15 * 24 * 60 * 60 * 1000);
                 const cycleLength = lastOrder.cycleLength || 30;
+                
+                // Future orders represent standard full-month cycles:
+                // Phase-1 is 15 days (15 laddus)
+                // Phase-2 is 15 days (15 laddus)
+                const p1Val = 15; 
+                const p2Val = 15;
 
-                for (let cycle = 1; cycle <= 2; cycle++) { // Cycles 2 and 3 (index 1 & 2)
-                    const cycleDaysToAdd = cycle * cycleLength;
+                // PRICING LOGIC: Calculate based on standard rates and Complete Plan discount (10%)
+                const RATE_P1 = parseFloat(process.env.VITE_PRICE_PER_LADDU_PHASE1 || 33.27);
+                const RATE_P2 = parseFloat(process.env.VITE_PRICE_PER_LADDU_PHASE2 || 33.27);
+                const DISCOUNT_COMPLETE = parseFloat(process.env.VITE_COMPLETE_PLAN_DISCOUNT || 0.9);
+                
+                // Calculate price per phase
+                const price1 = Math.round(p1Val * RATE_P1 * DISCOUNT_COMPLETE);
+                const price2 = Math.round(p2Val * RATE_P2 * DISCOUNT_COMPLETE);
 
-                    // ORDER 1 (Phase 1)
-                    const orderId1 = await generateOrderId(customer.customerId);
-                    const order1 = new Order({
+                // Start generating dates by adding the LAST quantity to the LAST delivery date
+                let currentDelivery = lastOrder.deliveryDate ? new Date(lastOrder.deliveryDate) : new Date();
+                let currentQtyToAdd = lastOrder.totalQuantity || 14; 
+                let nextPhase = lastOrder.phase === 'Phase-1' ? 'Phase-2' : 'Phase-1';
+
+                // Generate the next 5 sequence orders (to complete the 90 day schedule)
+                for (let i = 0; i < 5; i++) {
+                    const isP1 = nextPhase === 'Phase-1';
+                    const qty = isP1 ? p1Val : p2Val;
+                    const price = isP1 ? price1 : price2;
+
+                    // Next Delivery = Last Delivery Date + Last Quantity (1 laddu = 1 day)
+                    const nextDelivery = new Date(currentDelivery.getTime() + currentQtyToAdd * 24 * 60 * 60 * 1000);
+
+                    const newOrderId = await generateOrderId(customer.customerId);
+                    const newOrder = new Order({
                         customerId: customer.customerId,
-                        orderId: orderId1,
+                        orderId: newOrderId,
                         fullName: lastOrder.fullName,
                         phone: lastOrder.phone,
                         email: lastOrder.email,
-                        age: lastOrder.age,
+                        age: lastOrder.age || 0,
                         periodsStarted: new Date(lastOrder.periodsStarted),
                         cycleLength,
-                        phase: 'Phase-1',
-                        totalQuantity: p1Val,
-                        totalWeight: p1Val * 30,
-                        totalPrice: price1,
+                        phase: nextPhase,
+                        totalQuantity: qty,
+                        totalWeight: qty * 30,
+                        totalPrice: price,
                         address: lastOrder.address,
-                        paymentMethod: '',
-                        message: 'Subscription Future Order',
-                        orderStatus: 'Not Approved',
-                        planType: 'complete',
-                        subscriptionStatus: 'active',
-                        autoPhase2: true,
-                        deliveryDate: new Date(baseDeliveryDate.getTime() + cycleDaysToAdd * 24 * 60 * 60 * 1000),
-                    });
-                    const saved1 = await order1.save();
-                    customer.orders.push(saved1._id);
-
-                    // ORDER 2 (Phase 2)
-                    const orderId2 = await generateOrderId(customer.customerId);
-                    const order2 = new Order({
-                        customerId: customer.customerId,
-                        orderId: orderId2,
-                        fullName: lastOrder.fullName,
-                        phone: lastOrder.phone,
-                        email: lastOrder.email,
-                        age: lastOrder.age,
-                        periodsStarted: new Date(lastOrder.periodsStarted),
-                        cycleLength,
-                        phase: 'Phase-2',
-                        totalQuantity: p2Val,
-                        totalWeight: p2Val * 30,
-                        totalPrice: price2,
-                        address: lastOrder.address,
-                        paymentMethod: '',
+                        paymentMethod: 'Pending',
                         message: 'Subscription Auto-Order',
                         orderStatus: 'Not Approved',
                         planType: 'complete',
                         subscriptionStatus: 'active',
-                        autoPhase2: false,
-                        deliveryDate: new Date(baseNextDeliveryDate.getTime() + cycleDaysToAdd * 24 * 60 * 60 * 1000),
+                        autoPhase2: isP1,
+                        deliveryDate: new Date(nextDelivery),
                     });
-                    const saved2 = await order2.save();
-                    customer.orders.push(saved2._id);
+                    
+                    const saved = await newOrder.save();
+                    customer.orders.push(saved._id);
+
+                    // Update variables for the next loop iteration
+                    currentDelivery = nextDelivery;
+                    currentQtyToAdd = qty; // Next iteration will add this new quantity (15 days)
+                    nextPhase = isP1 ? 'Phase-2' : 'Phase-1';
                 }
                 await customer.save();
             }

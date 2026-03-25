@@ -38,10 +38,10 @@ export function calculateCycleMessage(data: CycleInput): CycleResult {
   const today = new Date(data.today);
   const cycleLength = data.average_cycle;
 
-  // Step 1: Calculate Current Day (1-indexed)
-  // Day 1 = last_period_date
-  let totalDaysPassed = Math.floor((today.getTime() - lastPeriodDate.getTime()) / (1000 * 60 * 60 * 24)) + 1;
-  let currentDay = totalDaysPassed;
+  // Step 1: Calculate Current Day (0-indexed base)
+  // Day 0 = last_period_date
+  let totalDaysPassed = Math.floor((today.getTime() - lastPeriodDate.getTime()) / (1000 * 60 * 60 * 24));
+  let currentDay = totalDaysPassed + 1; // Display as 1-indexed internally
 
   if (currentDay < 1) {
     throw new Error("Last period date cannot be in the future");
@@ -53,7 +53,8 @@ export function calculateCycleMessage(data: CycleInput): CycleResult {
   }
 
   // Step 2: Calculate Phase Duration
-  const phase1Duration = Math.floor(cycleLength / 2);
+  // We use standard 14 days for Phase 1 as requested by the user's example
+  const phase1Duration = 14;
   const phase2Duration = cycleLength - phase1Duration;
 
   // Step 3: Identify Current Phase
@@ -89,7 +90,8 @@ export function calculateCycleMessage(data: CycleInput): CycleResult {
     nextPhaseEndDayNum = cycleLength;
   } else {
     // Next phase is Phase-1 of the NEXT cycle
-    nextCycleStartDayMs = currentCycleStartDayMs + (cycleLength * 24 * 60 * 60 * 1000);
+    // We add cycleLength + 1 to account for the "next day" shift requested by the user
+    nextCycleStartDayMs = currentCycleStartDayMs + ((cycleLength + 1) * 24 * 60 * 60 * 1000);
     nextPhaseStartDayNum = 1;
     nextPhaseEndDayNum = phase1Duration;
   }
