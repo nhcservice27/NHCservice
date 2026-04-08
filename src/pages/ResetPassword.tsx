@@ -90,6 +90,7 @@ export default function ResetPassword() {
                                     <Input
                                         type="password"
                                         placeholder="At least 6 characters"
+                                        autoComplete="new-password"
                                         value={password}
                                         onChange={(e) => setPassword(e.target.value)}
                                         className="h-12 rounded-xl"
@@ -102,6 +103,7 @@ export default function ResetPassword() {
                                     <Input
                                         type="password"
                                         placeholder="Re-enter password"
+                                        autoComplete="new-password"
                                         value={confirmPassword}
                                         onChange={(e) => setConfirmPassword(e.target.value)}
                                         className="h-12 rounded-xl"

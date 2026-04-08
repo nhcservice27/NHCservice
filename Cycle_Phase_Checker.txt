@@ -1,0 +1,163 @@
+# Cycle Phase Checker & Subscription Logic Documentation
+
+This document outlines the complete functional and technical logic for the "Cycle Phase Checker" and automated "Subscription Management" system used in the Cycle Harmony platform. This logic can be used as a reference for implementing similar systems on other websites.
+
+---
+
+## 1. Core Concepts
+The system revolves around two primary hormonal phases of the menstrual cycle:
+- **Phase-1 (Follicular):** Defined as the first 14 days of the cycle.
+- **Phase-2 (Luteal):** Defined as the remaining days of the cycle (Cycle Length - 14).
+
+### Key Variables:
+- `last_period_date`: The date the user last started their periods.
+- `average_cycle`: The total length of the user's cycle (commonly 28-32 days).
+- `today`: The current calculation date.
+
+---
+
+## 2. Calculation Logic (Frontend)
+
+### Step A: Determine Current Day in Cycle
+1. Calculate `totalDaysPassed` = `today - last_period_date`.
+2. Normalize to a single cycle: `currentDay = (totalDaysPassed % average_cycle) + 1`.
+   *Example: If today is 20 days after the last period and the cycle is 30 days, they are on Day 21.*
+
+### Step B: Identify Phase
+1. **Phase-1:** `if currentDay <= 14`.
+2. **Phase-2:** `if currentDay > 14`.
+
+### Step C: Recommended Quantities (Standard Order)
+- **Remaining Days in Phase:** `days_left = phase_end_day - currentDay`.
+- **Advance Logic (The 8-Day Rule):** 
+  If `days_left + 1 < 8`:
+  - The current phase is almost over. Do NOT sell laddus for this phase.
+  - Instead, recommend **15 Laddus** for the **NEXT Phase**.
+  - Set `isNextPhaseAdvance = true`.
+- **Standard Logic:**
+  - Sell exactly the number of laddus needed to finish the current phase (`days_left + 1`).
+
+### Step D: Subscription Box (Complete Plan)
+- If `isNextPhaseAdvance` is true: Box contains **15 Phase-1 + 15 Phase-2 laddus** (Standard month).
+- Otherwise: Box contains `(Remaining days of current phase) + (Full duration of next phase)`.
+
+---
+
+## 3. Subscription Logic (Backend)
+
+Once a user upgrades to the "Complete Plan," the backend generates future orders automatically to ensure they never run out.
+
+### The Mathematical Sequence Rule:
+The most critical rule for future delivery dates is:
+`Next Delivery Date = Previous Delivery Date + Previous Quantity of Laddus`
+*(Where 1 Laddu = 1 Day of consumption)*
+
+### Standardizing the Sequence:
+- All future auto-generated orders are standardized to **15 Laddus**.
+- Orders alternate strictly between **Phase-1** and **Phase-2**.
+
+---
+
+## 4. Logic Examples (6 Scenarios)
+
+### Example 1: Mid-Phase 1 (Standard)
+- **Input:** Last Period: March 19 | Today: March 25 | Cycle: 30
+- **Calculation:** Day 7 (March 19 to 25 is 6 days passed + 1).
+- **Result:** Current Phase: **Phase-1**. 
+- **Days Left:** 14 - 7 = 7 days.
+- **Order:** 8 Laddus for Phase-1 (Today + 7 remaining).
+- **Next Delivery:** Today + 8 days = **April 2**.
+
+### Example 2: End of Phase (The Advance Rule)
+- **Input:** Last Period: March 15 | Today: March 25 | Cycle: 30
+- **Calculation:** Day 11.
+- **Days Left in Phase-1:** 14 - 11 = 3 days. 
+- **Logic:** 3 days + 1 (today) = 4. This is less than 8.
+- **Result:** **Advance to Phase-2**.
+- **Order:** 15 Laddus for Phase-2.
+- **Delivery Date:** Today + 4 days (the day Phase-2 starts) = **March 29**.
+
+### Example 3: Phase 2 Start
+- **Input:** Last Period: March 10 | Today: March 25 | Cycle: 28
+- **Calculation:** Day 16.
+- **Result:** Current Phase: **Phase-2**. 
+- **Days Left in Cycle:** 28 - 16 = 12 days.
+- **Order:** 13 Laddus for Phase-2 (Today + 12 remaining).
+
+### Example 4: Long Cycle (35 Days)
+- **Input:** Last Period: March 1 | Today: March 25 | Cycle: 35
+- **Calculation:** Day 25.
+- **Phase-1 Duration:** 14 days.
+- **Phase-2 Duration:** 35 - 14 = 21 days.
+- **Result:** Current Phase: **Phase-2**.
+- **Days Left:** 35 - 25 = 10 days.
+- **Order:** 11 Laddus for Phase-2.
+
+### Example 5: Subscription Sequence (Order #2)
+- **Input:** User just received **Order #1** (8 laddus) on **March 26**.
+- **Logic:** `March 26 + 8 laddus = April 3`.
+- **Result:** **Order #2** is automatically scheduled for **April 3**.
+- **Quantity:** Standardized to **15 laddus**.
+
+### Example 6: Subscription Sequence (Order #3)
+- **Input:** User just received **Order #2** (15 laddus) on **April 3**.
+- **Logic:** `April 3 + 15 laddus = April 18`.
+- **Result:** **Order #3** is automatically scheduled for **April 18**.
+- **Quantity:** Standardized to **15 laddus**.
+- **Phase:** If Order #2 was Phase-2, Order #3 is **Phase-1**.
+
+---
+
+## 5. Plan-Specific Logic & Pricing
+
+### A. Starter Plan (One-Time / One Phase)
+- **Goal:** Provide exactly enough laddus to finish the current active phase.
+- **Quantity:** `Days Remaining in Phase + 1 (Current Day)`.
+- **Exception:** If days remaining is `< 8`, quantity becomes **15** (for the *next* phase).
+- **Pricing:** `Quantity * Unit Price (e.g., ₹33.27)`.
+  *Note: No multi-phase discount is applied to Starter Plans.*
+
+### B. Complete Balance Plan (Subscription / Two Phases)
+- **Goal:** Provide a combined box for both follicular and luteal support.
+- **Quantity:** `(Days Remaining in Phase 1) + (Days Remaining in Phase 2)`.
+- **Composition:** 
+  - If current is Phase-1: `[Remaining P1] + [Full P2 Duration]`.
+  - If current is Phase-2: `[Remaining P2] + [Full P1 Duration]`.
+- **Standardized Subscription Qty:** All *future* automated orders are exactly **15 laddus**.
+- **Pricing:** `(Phase-1 Qty * Unit Price) + (Phase-2 Qty * Unit Price)`.
+- **Discount:** A **10% discount** is applied to the grand total of the Complete Plan.
+  *Formula:* `Total = Math.round( (P1_Price + P2_Price) * 0.90 )`.
+
+---
+
+## 6. Technical Implementation (Summary)
+
+### Frontend (JavaScript/TypeScript)
+```typescript
+const cycleLength = 30;
+const phase1Duration = 14;
+const totalDaysPassed = Math.floor((today - lastPeriod) / (longDayMs));
+const currentDay = (totalDaysPassed % cycleLength) + 1;
+
+const phase = currentDay <= 14 ? "Phase-1" : "Phase-2";
+const phaseEnd = phase === "Phase-1" ? 14 : cycleLength;
+const daysRemaining = phaseEnd - currentDay;
+
+if (daysRemaining + 1 < 8) {
+   // Recommend next phase, qty 15
+}
+```
+
+### Backend (Node.js/Express)
+```javascript
+// Generate sequence
+let currentDelivery = lastOrder.deliveryDate;
+let currentQty = lastOrder.totalQuantity;
+
+for (let i = 0; i < 5; i++) {
+    const nextDelivery = new Date(currentDelivery.getTime() + (currentQty * 24 * 60 * 60 * 1000));
+    // Save new order with 15 laddus, alternating phase
+    currentDelivery = nextDelivery;
+    currentQty = 15;
+}
+```

@@ -167,6 +167,7 @@ export default function ConfirmOrder() {
                                         onChange={(e) => setAddress({ ...address, house: e.target.value })}
                                         className="bg-white/50 border-gray-100 focus:bg-white h-12 rounded-xl"
                                         placeholder="e.g. Flat 402, Sunshine Apts"
+                                        autoComplete="address-line1"
                                     />
                                 </div>
                                 <div className="grid grid-cols-2 gap-4">
@@ -177,6 +178,7 @@ export default function ConfirmOrder() {
                                             onChange={(e) => setAddress({ ...address, area: e.target.value })}
                                             className="bg-white/50 border-gray-100 focus:bg-white h-12 rounded-xl"
                                             placeholder="e.g. Jubilee Hills"
+                                            autoComplete="address-line2"
                                         />
                                     </div>
                                     <div className="space-y-2">
@@ -186,6 +188,7 @@ export default function ConfirmOrder() {
                                             onChange={(e) => setAddress({ ...address, pincode: e.target.value })}
                                             className="bg-white/50 border-gray-100 focus:bg-white h-12 rounded-xl"
                                             placeholder="6-digit Pincode"
+                                            autoComplete="postal-code"
                                         />
                                     </div>
                                 </div>

@@ -219,6 +219,7 @@ const ContactUs = () => {
                         name="name"
                         type="text"
                         placeholder="Your full name"
+                        autoComplete="name"
                         value={formData.name}
                         onChange={handleChange}
                         className="pl-10 border-gray-300 focus:border-wellness-green focus:ring-wellness-green"
@@ -239,6 +240,7 @@ const ContactUs = () => {
                         name="phone"
                         type="tel"
                         placeholder="+91 1234567890"
+                        autoComplete="tel"
                         value={formData.phone}
                         onChange={handleChange}
                         className="pl-10 border-gray-300 focus:border-wellness-green focus:ring-wellness-green"

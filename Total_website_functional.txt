@@ -1,0 +1,121 @@
+# Total Website Functional Specification: Cycle Harmony
+
+This document serves as a complete technical and functional blueprint for building and maintaining the Cycle Harmony platform. It covers the frontend architecture, backend logic, database schema, and core business rules.
+
+---
+
+## 1. System Overview & Technology Stack
+
+Cycle Harmony is an e-commerce and wellness platform designed to provide seed-cycling laddus tailored to a user's menstrual cycle phases.
+
+### Technology Stack:
+- **Frontend:** React.js, Vite, Tailwind CSS, Lucide Icons, Shadcn UI Components.
+- **Backend:** Node.js, Express.js.
+- **Database:** MongoDB (using Mongoose ODM).
+- **Payments:** Razorpay Integration.
+- **Notifications:** Telegram Bot API (for Admin) and Email (SendGrid/Nodemailer).
+- **Authentication:** JWT (JSON Web Tokens) with HTTP-only Cookies.
+
+---
+
+## 2. Database Models (Schema)
+
+### A. Customer Model (`models/Customer.js`)
+- **Identity:** `customerId`, `email`, `phone`, `password`, `name`, `age`.
+- **Cycle Data:** `lastPeriodDate`, `averageCycleLength`.
+- **Subscription Info:** `planType` (starter/complete), `subscriptionStatus` (active/paused/inactive).
+- **Addresses:** Array of objects containing `house`, `area`, `pincode`, `landmark`, `mapLink`, and `label`.
+- **Relations:** Array of `Order` IDs.
+
+### B. Order Model (`models/Order.js`)
+- **Metadata:** `orderId`, `customerId`, `orderDate`.
+- **Cycle Context:** `periodsStarted`, `cycleLength`, `phase` (Phase-1/Phase-2).
+- **Product Details:** `totalQuantity`, `totalWeight`, `totalPrice`.
+- **Status:** `orderStatus` (Pending, Confirmed, Shipped, Delivered, Requested, Not Approved).
+- **Shipping:** `deliveryDate`, `shippingDate`, `address` details.
+- **Payment:** `paymentMethod`, `razorpayPaymentId`.
+
+---
+
+## 3. Core Business Logic (The "Calculation Engine")
+
+This logic is implemented in `src/lib/cycleCalculator.ts` (Frontend) and `server/routes/customerRoutes.js` (Backend).
+
+### A. Phase Identification
+- **Phase-1 (Follicular):** Days 1 to 14 of the cycle.
+- **Phase-2 (Luteal):** From Day 15 until the end of the `averageCycleLength`.
+
+### B. The 8-Day Advance Rule (Starter Plan)
+- If a user is currently in a phase but has **fewer than 8 days remaining**, the system automatically advances them to the **Next Phase** (selling 15 laddus for the upcoming phase) to ensure they have the product ready on time.
+
+### C. Subscription Sequence Logic (The "Math Rule")
+For users on the **Complete Balance Plan**, the system pre-generates future orders.
+- **Rule:** `Next Delivery Date = Previous Order's Delivery Date + Previous Order's Quantity`.
+- **Standardization:** All future subscription orders are fixed at exactly **15 laddus**.
+- **Phase Rotation:** Orders strictly alternate between Phase-1 and Phase-2.
+
+### D. Pricing Logic
+- **Base Rate:** Defined per laddu (e.g., ₹33.27).
+- **Plan Discount:** The "Complete Balance Plan" receives a **10% discount** on the total sum of both phases.
+- **Formula:** `Total = Math.round( (P1_Qty * Rate) + (P2_Qty * Rate) ) * 0.90`.
+
+---
+
+## 4. Major Frontend Workflows
+
+### A. Quiz & Cycle Checker
+- Users enter their last period date and cycle length.
+- The system calculates their current day and phase.
+- Displays a custom calendar showing "Next Delivery" and "Shipping Date."
+
+### B. Smart Checkout
+- **Guest Checkout:** New users can buy immediately; the system auto-registers them.
+- **Auto-Login:** Existing users are prompted for their password to retrieve saved addresses.
+- **Payment Choice:** Toggle between Cash on Delivery (COD) and Razorpay Secure.
+
+### C. Customer Profile Dashboard
+- **Last Order Banner:** Dynamically tracks the most relevant order. If the current order is "Delivered," it automatically rolls over to track the next sequence order.
+- **Vertical Tracking:** 4-stage vertical timeline (Pending -> Confirmed -> Shipped -> Delivered).
+- **Subscription Overview:** Displays the total 3-month roadmap.
+
+---
+
+## 5. Administrative Features (Control Panel)
+
+### A. Order Management
+- Admin can manually update statuses (e.g., move from "Shipped" to "Delivered").
+- **Requested Orders:** A unique section for orders that require admin validation before final processing.
+
+### B. Customer Management
+- View full order histories.
+- Manual data correction (e.g., fixing address typos or updating cycle lengths).
+
+---
+
+## 6. Integrations & Notifications
+
+### A. Telegram Bot API
+- The backend sends a real-time message to the Admin Telegram group whenever:
+  1. A new customer registers.
+  2. A new order is placed.
+  3. A payment is successfully verified.
+
+### B. Email Services
+- **Receipts:** HTML emails sent upon order confirmation.
+- **Auth:** Password reset links with 1-hour expiration tokens.
+
+---
+
+## 7. Environment Variables (.env)
+To build or run this system, the following keys are essential:
+- `MONGODB_URI`: Connection string for Atlas or local DB.
+- `JWT_SECRET`: Secret key for authentication.
+- `VITE_PRICE_PER_LADDU_PHASE1`: Pricing variable.
+- `VITE_COMPLETE_PLAN_DISCOUNT`: Usually `0.9` for 10% off.
+- `VITE_RAZORPAY_KEY`: Public key for frontend gateway.
+- `RAZORPAY_KEY_SECRET`: Private key for backend verification.
+- `TELEGRAM_BOT_TOKEN_NEW`: For admin notifications.
+- `FRONTEND_BASE_URL`: For generating password reset links.
+
+---
+*End of Specification*

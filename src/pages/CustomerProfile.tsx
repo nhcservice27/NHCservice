@@ -436,6 +436,7 @@ export default function CustomerProfile() {
                                             <Input
                                                 type="email"
                                                 placeholder="your@email.com"
+                                                autoComplete="email"
                                                 value={email}
                                                 onChange={(e) => setEmail(e.target.value)}
                                                 className="h-12 text-lg rounded-xl border-gray-200 focus:ring-pink-500"
@@ -461,6 +462,7 @@ export default function CustomerProfile() {
                                             <Input
                                                 type="password"
                                                 placeholder="Enter your password"
+                                                autoComplete="current-password"
                                                 value={password}
                                                 onChange={(e) => setPasswordInput(e.target.value)}
                                                 className="h-12 text-lg rounded-xl border-gray-200 focus:ring-pink-500"
@@ -503,6 +505,7 @@ export default function CustomerProfile() {
                                             <Label className="text-xs font-bold text-gray-400 uppercase tracking-widest ml-1">Full Name *</Label>
                                             <Input
                                                 placeholder="Your full name"
+                                                autoComplete="name"
                                                 value={registerForm.name}
                                                 onChange={(e) => setRegisterForm(f => ({ ...f, name: e.target.value }))}
                                                 className="h-12 rounded-xl border-gray-200 focus:ring-pink-500"
@@ -514,6 +517,7 @@ export default function CustomerProfile() {
                                             <Input
                                                 type="tel"
                                                 placeholder="e.g. 9876543210"
+                                                autoComplete="tel"
                                                 value={registerForm.phone}
                                                 onChange={(e) => setRegisterForm(f => ({ ...f, phone: e.target.value }))}
                                                 className="h-12 rounded-xl border-gray-200 focus:ring-pink-500"
@@ -552,6 +556,7 @@ export default function CustomerProfile() {
                                             <Input
                                                 type="password"
                                                 placeholder="At least 6 characters"
+                                                autoComplete="new-password"
                                                 value={password}
                                                 onChange={(e) => setPasswordInput(e.target.value)}
                                                 className="h-12 rounded-xl border-gray-200 focus:ring-pink-500"
@@ -564,6 +569,7 @@ export default function CustomerProfile() {
                                             <Input
                                                 type="password"
                                                 placeholder="Re-enter password"
+                                                autoComplete="new-password"
                                                 value={confirmPassword}
                                                 onChange={(e) => setConfirmPassword(e.target.value)}
                                                 className="h-12 rounded-xl border-gray-200 focus:ring-pink-500"
@@ -602,6 +608,7 @@ export default function CustomerProfile() {
                                             <Input
                                                 type="password"
                                                 placeholder="At least 6 characters"
+                                                autoComplete="new-password"
                                                 value={newPassword}
                                                 onChange={(e) => setNewPassword(e.target.value)}
                                                 className="h-12 text-lg rounded-xl border-gray-200 focus:ring-pink-500"
@@ -613,6 +620,7 @@ export default function CustomerProfile() {
                                             <Input
                                                 type="password"
                                                 placeholder="Re-enter password"
+                                                autoComplete="new-password"
                                                 value={confirmPassword}
                                                 onChange={(e) => setConfirmPassword(e.target.value)}
                                                 className="h-12 text-lg rounded-xl border-gray-200 focus:ring-pink-500"
@@ -656,6 +664,7 @@ export default function CustomerProfile() {
                                         <Input
                                             type="email"
                                             placeholder="your@email.com"
+                                            autoComplete="email"
                                             value={forgotPasswordEmail}
                                             onChange={(e) => setForgotPasswordEmail(e.target.value)}
                                             className="h-12"
@@ -1191,6 +1200,7 @@ export default function CustomerProfile() {
                                                             value={newAddress.house}
                                                             onChange={e => setNewAddress({ ...newAddress, house: e.target.value })}
                                                             placeholder="Flat 101, Galaxy Apts"
+                                                            autoComplete="address-line1"
                                                             required
                                                         />
                                                     </div>
@@ -1200,6 +1210,7 @@ export default function CustomerProfile() {
                                                             value={newAddress.area}
                                                             onChange={e => setNewAddress({ ...newAddress, area: e.target.value })}
                                                             placeholder="Green Park, Church Road"
+                                                            autoComplete="address-line2"
                                                             required
                                                         />
                                                     </div>
@@ -1210,6 +1221,7 @@ export default function CustomerProfile() {
                                                                 value={newAddress.pincode}
                                                                 onChange={e => setNewAddress({ ...newAddress, pincode: e.target.value })}
                                                                 placeholder="500001"
+                                                                autoComplete="postal-code"
                                                                 required
                                                             />
                                                         </div>

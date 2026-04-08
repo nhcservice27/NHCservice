@@ -6,83 +6,74 @@
 
 @layer base {
   :root {
-    /* Natural wellness color palette */
-    --background: 42 50% 96%;
-    /* Soft cream */
-    --foreground: 25 30% 25%;
-    /* Warm dark brown */
+    /* -- Natural Green Palette -- */
+    --background: 120 20% 98%;      /* Very light mint/white */
+    --foreground: 120 40% 15%;      /* Deep Forest Green text */
 
     --card: 0 0% 100%;
-    /* Pure white */
-    --card-foreground: 25 30% 25%;
+    --card-foreground: 120 40% 15%;
 
     --popover: 0 0% 100%;
-    --popover-foreground: 25 30% 25%;
+    --popover-foreground: 120 40% 15%;
 
-    /* Wellness brand colors */
-    --primary: 120 25% 55%;
-    /* Soft sage green */
-    --primary-foreground: 0 0% 100%;
-    --primary-light: 120 35% 85%;
-    /* Light sage */
+    /* Wellness brand colors - GREEN FOCUS */
+    --primary: 140 35% 45%;         /* Sage Green */
+    --primary-foreground: 120 20% 98%;
+    --primary-light: 140 45% 90%;   /* Soft Mint */
 
-    --secondary: 340 50% 85%;
-    /* Soft pink */
-    --secondary-foreground: 25 30% 25%;
+    --secondary: 160 25% 65%;       /* Eucalyptus Green */
+    --secondary-foreground: 120 40% 15%;
 
-    --accent: 50 65% 88%;
-    /* Light yellow */
-    --accent-foreground: 25 30% 25%;
+    --accent: 80 30% 90%;           /* Light Moss/Yellow-Green */
+    --accent-foreground: 120 40% 15%;
 
-    --wellness-cream: 48 100% 93%;
-    --wellness-pink: 351 100% 86%;
-    --wellness-yellow: 50 65% 88%;
-    --wellness-green: 122 39% 49%;
-    --wellness-green-light: 122 39% 85%;
+    --wellness-cream: 60 40% 98%;
+    --wellness-pink: 351 100% 94%;  /* Very soft pink, almost invisible */
+    --wellness-yellow: 60 100% 96%;
+    --wellness-green: 142 45% 40%;  /* Rich Leaf Green */
+    --wellness-green-light: 142 45% 92%; /* Pale Sage */
+    --wellness-sage: 120 15% 85%;
+    --wellness-forest: 145 40% 25%;
 
-    --muted: 42 30% 90%;
-    --muted-foreground: 25 20% 45%;
+    --muted: 120 10% 94%;
+    --muted-foreground: 120 15% 45%;
 
     --destructive: 0 84.2% 60.2%;
     --destructive-foreground: 0 0% 100%;
 
-    --border: 42 30% 88%;
-    --input: 42 30% 88%;
-    --ring: 120 25% 55%;
+    --border: 120 15% 90%;
+    --input: 120 15% 90%;
+    --ring: 140 35% 45%;
 
-    --radius: 1rem;
+    --radius: 1.25rem;
+
+    /* -- Premium Visual Systems -- */
+    --glass-bg: rgba(255, 255, 255, 0.6);
+    --glass-border: rgba(255, 255, 255, 0.3);
+    --glass-green-bg: rgba(230, 245, 235, 0.5);
+    --glass-green-border: rgba(142, 195, 155, 0.4);
 
     /* Gradients */
-    --gradient-wellness: linear-gradient(135deg, hsl(var(--wellness-cream)) 0%, hsl(var(--wellness-pink)) 50%, hsl(var(--wellness-yellow)) 100%);
-    --gradient-soft: linear-gradient(180deg, hsl(var(--wellness-green-light)) 0%, hsl(var(--wellness-cream)) 100%);
-    --gradient-hero: linear-gradient(135deg, hsl(var(--wellness-cream)) 0%, hsl(var(--wellness-green-light)) 100%);
+    --gradient-botanical: linear-gradient(135deg, hsl(120 30% 98%) 0%, hsl(140 40% 92%) 100%);
+    --gradient-forest: linear-gradient(135deg, hsl(145 40% 25%) 0%, hsl(140 35% 45%) 100%);
+    --gradient-mint: linear-gradient(180deg, hsl(142 45% 92%) 0%, hsl(60 40% 98%) 100%);
 
-    /* Shadows */
-    --shadow-soft: 0 4px 20px -4px hsl(var(--wellness-green) / 0.15);
-    --shadow-card: 0 8px 30px -8px hsl(var(--wellness-green) / 0.2);
-    --shadow-hero: 0 20px 60px -20px hsl(var(--wellness-green) / 0.25);
+    /* Shadows - Ambient Occlusion Style */
+    --shadow-premium: 0 10px 40px -10px rgba(0, 0, 0, 0.05), 0 2px 20px -8px rgba(0, 0, 0, 0.02);
+    --shadow-glass: 0 8px 32px 0 rgba(142, 195, 155, 0.15);
+    --shadow-glow: 0 0 20px rgba(142, 195, 155, 0.3);
 
     /* Typography */
     --font-heading: 'Playfair Display', serif;
     --font-body: 'Inter', sans-serif;
-
-    /* Animations */
-    --transition-smooth: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
-    --transition-bounce: all 0.6s cubic-bezier(0.68, -0.55, 0.265, 1.55);
-
-    --sidebar-background: 0 0% 98%;
-    --sidebar-foreground: 240 5.3% 26.1%;
-    --sidebar-primary: 240 5.9% 10%;
+    
+    /* Animation Tokens */
+    --transition-premium: all 0.5s cubic-bezier(0.23, 1, 0.32, 1);
     --sidebar-primary-foreground: 0 0% 98%;
     --sidebar-accent: 240 4.8% 95.9%;
     --sidebar-accent-foreground: 240 5.9% 10%;
     --sidebar-border: 220 13% 91%;
     --sidebar-ring: 217.2 91.2% 59.8%;
-
-    /* Wellness-themed colors - ENHANCED */
-    --wellness-pink: 340 75% 88%;
-    --wellness-green: 140 45% 55%;
-    --wellness-cream: 40 50% 97%;
   }
 
   .dark {
@@ -141,7 +132,8 @@
   }
 
   body {
-    @apply bg-background text-foreground bg-gradient-to-b from-wellness-cream via-wellness-green-light/40 to-wellness-pink/40;
+    @apply bg-background text-foreground;
+    background-image: var(--gradient-botanical);
     font-family: var(--font-body);
     margin: 0;
     padding: 0;
@@ -156,72 +148,60 @@
   h5,
   h6 {
     font-family: var(--font-heading);
+    letter-spacing: -0.02em;
+    font-weight: 600;
   }
 
-  .noise-bg {
+  .mesh-bg-green {
+    background-color: hsl(var(--background));
+    background-image: 
+      radial-gradient(at 0% 0%, hsla(142, 45%, 90%, 0.3) 0, transparent 50%), 
+      radial-gradient(at 50% 0%, hsla(120, 30%, 95%, 0.3) 0, transparent 50%), 
+      radial-gradient(at 100% 0%, hsla(140, 40%, 90%, 0.3) 0, transparent 50%);
     position: relative;
+    overflow: hidden;
   }
 
-  .noise-bg::before {
-    content: "";
-    position: absolute;
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: 100%;
-    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.65' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)' opacity='0.05'/%3E%3C/svg%3E");
-    pointer-events: none;
-    z-index: 10;
-    opacity: 0.4;
+  /* Smooth scroll reveal placeholder animations */
+  .reveal-on-scroll {
+    opacity: 0;
+    transform: translateY(20px);
+    transition: var(--transition-premium);
   }
 
-  .perspective-1000 {
-    perspective: 1000px;
-  }
-
-  .preserve-3d {
-    transform-style: preserve-3d;
-  }
-
-  .backface-hidden {
-    backface-visibility: hidden;
-  }
-
-  .rotate-y-180 {
-    transform: rotateY(180deg);
+  .reveal-on-scroll.active {
+    opacity: 1;
+    transform: translateY(0);
   }
 }
 
 @layer components {
-  .wellness-gradient {
-    background: var(--gradient-wellness);
+  .glass-card {
+    background: var(--glass-bg);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    border: 1px solid var(--glass-border);
+    box-shadow: var(--shadow-glass);
   }
 
-  .soft-gradient {
-    background: var(--gradient-soft);
+  .glass-green {
+    background: var(--glass-green-bg);
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+    border: 1px solid var(--glass-green-border);
+    box-shadow: var(--shadow-glass);
   }
 
-  .hero-gradient {
-    background: var(--gradient-hero);
+  .premium-shadow {
+    box-shadow: var(--shadow-premium);
   }
 
-  .shadow-soft {
-    box-shadow: var(--shadow-soft);
+  .glow-on-hover:hover {
+    box-shadow: var(--shadow-glow);
+    transform: translateY(-2px);
   }
 
-  .shadow-card {
-    box-shadow: var(--shadow-card);
-  }
-
-  .shadow-hero {
-    box-shadow: var(--shadow-hero);
-  }
-
-  .transition-smooth {
-    transition: var(--transition-smooth);
-  }
-
-  .transition-bounce {
-    transition: var(--transition-bounce);
+  .transition-premium {
+    transition: var(--transition-premium);
   }
 }

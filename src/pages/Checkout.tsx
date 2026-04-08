@@ -378,6 +378,7 @@ const Checkout = () => {
                                                 id="email"
                                                 type="email"
                                                 placeholder="your@email.com"
+                                                autoComplete="username email"
                                                 value={email}
                                                 onChange={(e) => setEmail(e.target.value)}
                                                 required
@@ -389,6 +390,7 @@ const Checkout = () => {
                                                 id="password"
                                                 type="password"
                                                 placeholder="••••••••"
+                                                autoComplete="current-password"
                                                 value={password}
                                                 onChange={(e) => setPassword(e.target.value)}
                                                 required
@@ -425,12 +427,22 @@ const Checkout = () => {
                                 <CardContent className="space-y-4">
                                     <div className="grid gap-2">
                                         <Label>Full Name</Label>
-                                        <Input value={name} onChange={e => setName(e.target.value)} placeholder="Your full name" />
+                                        <Input 
+                                            value={name} 
+                                            onChange={e => setName(e.target.value)} 
+                                            placeholder="Your full name"
+                                            autoComplete="name"
+                                        />
                                     </div>
                                     <div className="grid grid-cols-2 gap-4">
                                         <div className="grid gap-2">
                                             <Label>Phone Number</Label>
-                                            <Input value={phone} onChange={e => setPhone(e.target.value)} placeholder="10 digit mobile" />
+                                            <Input 
+                                                value={phone} 
+                                                onChange={e => setPhone(e.target.value)} 
+                                                placeholder="10 digit mobile"
+                                                autoComplete="tel"
+                                            />
                                         </div>
                                         <div className="grid gap-2">
                                             <Label>Age</Label>
@@ -469,6 +481,7 @@ const Checkout = () => {
                                                     value={address.house}
                                                     onChange={e => setAddress({ ...address, house: e.target.value })}
                                                     placeholder="Flat 203, Sai Residency"
+                                                    autoComplete="address-line1"
                                                     required
                                                 />
                                             </div>
@@ -478,6 +491,7 @@ const Checkout = () => {
                                                     value={address.area}
                                                     onChange={e => setAddress({ ...address, area: e.target.value })}
                                                     placeholder="Kukatpally, Road No. 5"
+                                                    autoComplete="address-line2"
                                                     required
                                                 />
                                             </div>
@@ -511,6 +525,7 @@ const Checkout = () => {
                                                         placeholder="500072"
                                                         inputMode="numeric"
                                                         maxLength={6}
+                                                        autoComplete="postal-code"
                                                         required
                                                     />
                                                 </div>

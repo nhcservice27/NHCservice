@@ -81,6 +81,7 @@ const AdminLogin = () => {
                     id="username"
                     type="text"
                     placeholder="Enter username"
+                    autoComplete="username"
                     value={username}
                     onChange={(e) => setUsername(e.target.value)}
                     className="pl-10"
@@ -97,6 +98,7 @@ const AdminLogin = () => {
                     id="password"
                     type="password"
                     placeholder="Enter password"
+                    autoComplete="current-password"
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
                     className="pl-10"

@@ -350,7 +350,7 @@ export const CycleCompanion = () => {
             <CardContent className="pt-6 space-y-5">
               <div className="space-y-2">
                 <Label htmlFor="name" className="text-gray-700">Name 💝</Label>
-                <Input id="name" value={name} onChange={(e) => setName(e.target.value)} placeholder="Enter your name" className="h-11 rounded-lg border-gray-200 bg-white/50 focus:border-pink-300 focus:ring-pink-100" />
+                <Input id="name" autoComplete="name" value={name} onChange={(e) => setName(e.target.value)} placeholder="Enter your name" className="h-11 rounded-lg border-gray-200 bg-white/50 focus:border-pink-300 focus:ring-pink-100" />
               </div>
               <div className="space-y-2">
                 <Label htmlFor="lastPeriodDate" className="text-gray-700">Last Period Start Date</Label>

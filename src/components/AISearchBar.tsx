@@ -82,6 +82,7 @@ export const AISearchBar = () => {
                   value={query}
                   onChange={(e) => setQuery(e.target.value)}
                   placeholder="Ask about seed cycling, laddus..."
+                  autoComplete="off"
                   className="w-full px-4 py-2 pr-12 rounded-lg border border-input bg-background text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary"
                 />
                 <Button
